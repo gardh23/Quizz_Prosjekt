@@ -94,7 +94,7 @@ Vi starter med **backend**, deretter frontend, så kobler vi alt sammen med Sock
 - [x] Lag tabell: `answers` (id, question_id, text, is_correct DEFAULT true) — brukes for både flervalg og fritekst. Fritekst har ett svar (fasit), is_correct er true som standard
 - [x] REST-endepunkter for quiz CRUD (opprett, les, oppdater, slett)
 - [x] Kun hosts og admin har tilgang til å opprette/endre quizer
-- [ ] REST-endepunkter for spørsmål (opprett ferdig, mangler oppdater og slett)
+- [x] REST-endepunkter for spørsmål (opprett, oppdater, slett)
 - [ ] Filhåndtering: opplasting av bilde/lyd per spørsmål med MIME-type validering og filstørrelsesbegrensning
 
 ### FASE 3 — Sanntidslogikk med Socket.io
@@ -131,4 +131,4 @@ Vi starter med **backend**, deretter frontend, så kobler vi alt sammen med Sock
 
 ## Neste steg
 
-**Start her:** Legg til `PUT` og `DELETE` for spørsmål i `server/routes/quiz.js`, deretter filhåndtering med `multer`.
+**Start her:** Filhåndtering med `multer` — installer pakken, sett opp opplasting av bilde (jpg/png) og lyd (mp3) per spørsmål med MIME-type validering og filstørrelsesbegrensning.

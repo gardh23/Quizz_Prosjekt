@@ -78,33 +78,79 @@ router.delete('/:id', requireAuth, requireRole('host', 'admin'), async (req, res
     }
 })
 
-  router.post('/:id/questions', requireAuth, requireRole('host', 'admin'), async (req, res) => {                                                            
-      const { id } = req.params                                                                                                                             
-      const { type, text, time_limit, speed_bonus, order_index, answers } = req.body                                                                        
-                                                                                                                                                            
-      try {                                                                                                                                                 
-          const questionResult = await pool.query(                                                                                                          
-              'INSERT INTO questions (quiz_id, type, text, time_limit, speed_bonus, order_index) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',              
-              [id, type, text, time_limit, speed_bonus, order_index]                                                                                        
-          )                                                                                                                                                 
-                                                                                                                                                            
-          const question = questionResult.rows[0]                                                                                                           
-  
-          if (answers && answers.length > 0) {                                                                                                              
-              for (const answer of answers) {               
-                  await pool.query(
-                      'INSERT INTO answers (question_id, text, is_correct) VALUES ($1, $2, $3)',
-                      [question.id, answer.text, answer.is_correct]                                                                                         
-                  )                                                                                                                                         
-              }                                                                                                                                             
-          }                                                                                                                                                 
-                                                            
-          res.status(201).json(question)
-      } catch (err) {
-          console.error(err)
-          res.status(500).json({ error: 'Noe gikk galt' })
-      }                                                                                                                                                     
-  })
+router.post('/:id/questions', requireAuth, requireRole('host', 'admin'), async (req, res) => {
+    const { id } = req.params
+    const { type, text, time_limit, speed_bonus, order_index, answers } = req.body
+
+    try {
+        const questionResult = await pool.query(
+            'INSERT INTO questions (quiz_id, type, text, time_limit, speed_bonus, order_index) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [id, type, text, time_limit, speed_bonus, order_index]
+        )
+
+        const question = questionResult.rows[0]
+
+        if (answers && answers.length > 0) {
+            for (const answer of answers) {
+                await pool.query(
+                    'INSERT INTO answers (question_id, text, is_correct) VALUES ($1, $2, $3)',
+                    [question.id, answer.text, answer.is_correct]
+                )
+            }
+        }
+
+        res.status(201).json(question)
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: 'Noe gikk galt' })
+    }
+})
+
+
+router.put('/:quizId/questions/:questionId', requireAuth, requireRole('host', 'admin'), async (req, res) => {
+    const { questionId } = req.params
+    const { type, text, time_limit, speed_bonus, order_index, answers } = req.body
+
+    try {
+        const result = await pool.query(
+            'UPDATE questions SET type=$1, text=$2, time_limit=$3, speed_bonus=$4, order_index=$5 WHERE id=$6 RETURNING *',
+            [type, text, time_limit, speed_bonus, order_index, questionId]
+        )
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Spørsmål ikke funnet' })
+        }
+
+        if (answers && answers.length > 0) {
+            await pool.query('DELETE FROM answers WHERE question_id = $1', [questionId])
+            for (const answer of answers) {
+                await pool.query(
+                    'INSERT INTO answers (question_id, text, is_correct) VALUES ($1, $2, $3)',
+                    [questionId, answer.text, answer.is_correct]
+                )
+            }
+        }
+
+        res.json(result.rows[0])
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: 'Noe gikk galt' })
+    }
+})
+
+router.delete('/:quizId/questions/:questionId', requireAuth, requireRole('host', 'admin'), async (req, res) => {
+    const { questionId } = req.params
+
+    try {
+        const result = await pool.query('DELETE FROM questions WHERE id = $1 RETURNING id', [questionId])
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Spørsmål ikke funnet' })
+        }
+        res.json({ message: 'Spørsmål slettet' })
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: 'Noe gikk galt' })
+    }
+})
 
 
 module.exports = router
