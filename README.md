@@ -16,7 +16,7 @@ Kahoot-inspirert quiz-applikasjon med støtte for flervalg og fritekst-svar.
 - **Brukeren skriver mesteparten av koden selv** — din rolle er å forklare, veilede og vise retning, ikke å skrive alt ferdig
 - **Aldri push til GitHub direkte** — brukeren gjør alle commits og pushes selv
 - **Du kan oppdatere denne README-filen** for å holde oversikt over fremdrift og nye instrukser
-- Brukeren lærer mens han bygger — **forklar alltid hva og hvorfor i detalj for hvert steg**, ikke bare hvordan. Ikke anta at brukeren vet hva noe er eller gjør — forklar konseptet, hvorfor vi gjør det, og hva som skjer under panseret
+- Brukeren lærer mens han bygger — **forklar alltid hva og hvorfor i detalj**, ikke bare hvordan. Ikke anta at brukeren vet hva noe er eller gjør — forklar konseptet, hvorfor vi gjør det, og hva som skjer under panseret. **Forklar underveis mens vi bygger, ikke alt på forhånd.**
 - **Hvis brukeren gir nye instrukser eller preferanser underveis, oppdater alltid denne README-filen slik at neste Claude-sesjon forstår dem**
 
 ---
@@ -45,12 +45,17 @@ En quiz-app som ligner Kahoot, med følgende særtrekk:
 
 ```
 Quizz/
-├── client/          # React + Vite frontend (boilerplate, ikke påbegynt)
+├── client/              # React + Vite frontend (boilerplate, ikke påbegynt)
 │   └── src/
-│       ├── App.jsx  # Standard Vite startside, skal bygges om
+│       ├── App.jsx      # Standard Vite startside, skal bygges om
 │       └── main.jsx
 ├── server/
-│   └── index.js     # Enkel Express-server, bare GET / foreløpig
+│   ├── index.js         # Express-server med express.json() og auth-ruter koblet til
+│   ├── db.js            # PostgreSQL Pool-tilkobling
+│   ├── routes/
+│   │   └── auth.js      # POST /auth/register og POST /auth/login med bcrypt + JWT
+│   └── middleware/
+│       └── auth.js      # IKKE FERDIG — neste steg
 └── README.md
 ```
 
@@ -61,32 +66,35 @@ Quizz/
 Vi starter med **backend**, deretter frontend, så kobler vi alt sammen med Socket.io.
 
 ### FASE 1 — Database og brukermodell
-**Status: Påbegynt**
+**Status: Ferdig**
 
 - [x] Sett opp PostgreSQL lokalt (installert via Homebrew, `brew install postgresql@16`)
 - [x] Opprettet database: `createdb quizz_db`
 - [x] Opprettet `users`-tabell med kolonnene: id, username, password_hash, role (admin/host/player)
 - [x] Installert pakker: `npm install pg bcrypt jsonwebtoken` (kjørt `npm audit fix` etterpå)
-- [ ] Opprett `server/db.js` — databasetilkobling via `pg` Pool
-- [ ] Koble Express til databasen med `pg`-pakken
-- [ ] Implementer registrering og innlogging med **bcrypt** (passord-hashing)
-- [ ] Implementer **JWT**-tokens for autentisering
-- [ ] Lag middleware som beskytter ruter basert på rolle
+- [x] Opprettet `server/db.js` — databasetilkobling via `pg` Pool
+- [x] Koblet Express til databasen med `pg`-pakken
+- [x] Implementert registrering (`POST /auth/register`) med bcrypt-hashing
+- [x] Implementert innlogging (`POST /auth/login`) med bcrypt.compare + JWT-token i respons
+- [x] Lag `middleware/auth.js` — verifiser JWT og beskytt ruter basert på rolle
 
 #### Notater
 - Node.js v25, npm v11, PostgreSQL v16
 - PostgreSQL kjører som Homebrew-tjeneste (`brew services start postgresql@16`)
 - Databasebruker: `gard`, ingen passord lokalt, port: 5432
 - `users`-tabellen: id (SERIAL PK), username (VARCHAR 50, UNIQUE), password_hash (TEXT), role (VARCHAR 10, default: 'player')
+- JWT_SECRET er hardkodet i `auth.js` som `'midlertidig_hemmelig_nokkel'` — skal flyttes til `.env` i produksjon
+- Token utløper etter 7 dager (`expiresIn: '7d'`)
 
 ### FASE 2 — Quiz-modell og API
-**Status: Ikke påbegynt**
+**Status: Påbegynt**
 
-- [ ] Lag tabell: `quizzes` (id, title, created_by, created_at)
-- [ ] Lag tabell: `questions` (id, quiz_id, type: multiple_choice/free_text, text, time_limit, speed_bonus: bool, order)
-- [ ] Lag tabell: `answers` (id, question_id, text, is_correct) — for flervalg
-- [ ] REST-endepunkter for quiz CRUD (opprett, les, oppdater, slett)
-- [ ] Kun hosts og admin har tilgang til å opprette/endre quizer
+- [x] Lag tabell: `quizzes` (id, title, created_by, created_at)
+- [x] Lag tabell: `questions` (id, quiz_id, type, text, time_limit, speed_bonus, order_index, image_path, audio_path)
+- [x] Lag tabell: `answers` (id, question_id, text, is_correct DEFAULT true) — brukes for både flervalg og fritekst. Fritekst har ett svar (fasit), is_correct er true som standard
+- [x] REST-endepunkter for quiz CRUD (opprett, les, oppdater, slett)
+- [x] Kun hosts og admin har tilgang til å opprette/endre quizer
+- [ ] REST-endepunkter for spørsmål (opprett ferdig, mangler oppdater og slett)
 - [ ] Filhåndtering: opplasting av bilde/lyd per spørsmål med MIME-type validering og filstørrelsesbegrensning
 
 ### FASE 3 — Sanntidslogikk med Socket.io
@@ -123,4 +131,4 @@ Vi starter med **backend**, deretter frontend, så kobler vi alt sammen med Sock
 
 ## Neste steg
 
-**Start her:** Fase 1 — installer `pg` og `bcrypt` og `jsonwebtoken` i server, sett opp PostgreSQL lokalt, og lag den første databasetilkoblingen.
+**Start her:** Legg til `PUT` og `DELETE` for spørsmål i `server/routes/quiz.js`, deretter filhåndtering med `multer`.
