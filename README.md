@@ -90,7 +90,7 @@ Vi starter med **backend**, deretter frontend, så kobler vi alt sammen med Sock
 - Token utløper etter 7 dager (`expiresIn: '7d'`)
 
 ### FASE 2 — Quiz-modell og API
-**Status: Påbegynt**
+**Status: Ferdig**
 
 - [x] Lag tabell: `quizzes` (id, title, created_by, created_at)
 - [x] Lag tabell: `questions` (id, quiz_id, type, text, time_limit, speed_bonus, order_index, image_path, audio_path)
@@ -134,4 +134,4 @@ Vi starter med **backend**, deretter frontend, så kobler vi alt sammen med Sock
 
 ## Neste steg
 
-**Start her:** Filhåndtering med `multer` — installer pakken, sett opp opplasting av bilde (jpg/png) og lyd (mp3) per spørsmål med MIME-type validering og filstørrelsesbegrensning.
+**Start her:** Fase 3 — installer `socket.io`, sett opp spilløkt med romkode, host-styring og sanntidskommunikasjon mellom spillere.
