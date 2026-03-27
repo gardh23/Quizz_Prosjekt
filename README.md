@@ -86,8 +86,10 @@ Vi starter med **backend**, deretter frontend, så kobler vi alt sammen med Sock
 - PostgreSQL kjører som Homebrew-tjeneste (`brew services start postgresql@16`)
 - Databasebruker: `gard`, ingen passord lokalt, port: 5432
 - `users`-tabellen: id (SERIAL PK), username (VARCHAR 50, UNIQUE), password_hash (TEXT), role (VARCHAR 10, default: 'player')
-- JWT_SECRET er hardkodet i `auth.js` som `'midlertidig_hemmelig_nokkel'` — skal flyttes til `.env` i produksjon
+- JWT_SECRET ligger i `server/.env` — aldri hardkod hemmeligheter i koden
 - Token utløper etter 7 dager (`expiresIn: '7d'`)
+- Alle miljøvariabler ligger i `server/.env`: PORT, JWT_SECRET, DB_USER, DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT
+- `dotenv` lastes øverst i `index.js` med `require('dotenv').config()`
 
 ### FASE 2 — Quiz-modell og API
 **Status: Ferdig**
@@ -95,7 +97,7 @@ Vi starter med **backend**, deretter frontend, så kobler vi alt sammen med Sock
 - [x] Lag tabell: `quizzes` (id, title, created_by, created_at)
 - [x] Lag tabell: `questions` (id, quiz_id, type, text, time_limit, speed_bonus, order_index, image_path, audio_path)
 - [x] Lag tabell: `answers` (id, question_id, text, is_correct DEFAULT true) — brukes for både flervalg og fritekst. Fritekst har ett svar (fasit), is_correct er true som standard
-- [x] REST-endepunkter for quiz CRUD (opprett, les, oppdater, slett)
+- [x] REST-endepunkter for quiz CRUD (opprett, les, slett) — oppdatering av quiz-tittel ikke implementert ennå
 - [x] Kun hosts og admin har tilgang til å opprette/endre quizer
 - [x] REST-endepunkter for spørsmål (opprett, oppdater, slett)
 - [x] Filhåndtering: opplasting av bilde/lyd per spørsmål med MIME-type validering og filstørrelsesbegrensning (multer, maks 10MB, jpg/png/mp3)
