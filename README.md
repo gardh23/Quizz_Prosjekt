@@ -50,12 +50,15 @@ Quizz/
 │       ├── App.jsx      # Standard Vite startside, skal bygges om
 │       └── main.jsx
 ├── server/
-│   ├── index.js         # Express-server med express.json() og auth-ruter koblet til
-│   ├── db.js            # PostgreSQL Pool-tilkobling
+│   ├── index.js         # Express-server, monterer alle ruter og static /uploads
+│   ├── db.js            # PostgreSQL Pool-tilkobling (bruker: gard, db: quizz_db)
 │   ├── routes/
-│   │   └── auth.js      # POST /auth/register og POST /auth/login med bcrypt + JWT
-│   └── middleware/
-│       └── auth.js      # IKKE FERDIG — neste steg
+│   │   ├── auth.js      # POST /auth/register og POST /auth/login med bcrypt + JWT
+│   │   └── quiz.js      # CRUD for quizer og spørsmål, inkl. filopplasting
+│   ├── middleware/
+│   │   ├── auth.js      # requireAuth (JWT-verifisering) + requireRole(...roles)
+│   │   └── upload.js    # multer-konfig: jpg/png/mp3, maks 10MB, lagres i uploads/
+│   └── uploads/         # Opplastede bilde- og lydfiler (ikke versjonskontrollert)
 └── README.md
 ```
 
@@ -95,7 +98,7 @@ Vi starter med **backend**, deretter frontend, så kobler vi alt sammen med Sock
 - [x] REST-endepunkter for quiz CRUD (opprett, les, oppdater, slett)
 - [x] Kun hosts og admin har tilgang til å opprette/endre quizer
 - [x] REST-endepunkter for spørsmål (opprett, oppdater, slett)
-- [ ] Filhåndtering: opplasting av bilde/lyd per spørsmål med MIME-type validering og filstørrelsesbegrensning
+- [x] Filhåndtering: opplasting av bilde/lyd per spørsmål med MIME-type validering og filstørrelsesbegrensning (multer, maks 10MB, jpg/png/mp3)
 
 ### FASE 3 — Sanntidslogikk med Socket.io
 **Status: Ikke påbegynt**

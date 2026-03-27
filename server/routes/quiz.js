@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router()
 const pool = require('../db')
 const { requireAuth, requireRole } = require('../middleware/auth')
+const upload = require('../middleware/upload')
 
 router.post('/', requireAuth, requireRole('host', 'admin'), async (req, res) => {
     const { title } = req.body
@@ -78,20 +79,23 @@ router.delete('/:id', requireAuth, requireRole('host', 'admin'), async (req, res
     }
 })
 
-router.post('/:id/questions', requireAuth, requireRole('host', 'admin'), async (req, res) => {
+router.post('/:id/questions', requireAuth, requireRole('host', 'admin'), upload.fields([{ name: 'image' }, { name: 'audio' }]), async (req, res) => {
     const { id } = req.params
     const { type, text, time_limit, speed_bonus, order_index, answers } = req.body
+    const parsedAnswers = typeof answers === 'string' ? JSON.parse(answers) : answers
+    const image_path = req.files?.image ? req.files.image[0].path : null
+    const audio_path = req.files?.audio ? req.files.audio[0].path : null
 
     try {
         const questionResult = await pool.query(
-            'INSERT INTO questions (quiz_id, type, text, time_limit, speed_bonus, order_index) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [id, type, text, time_limit, speed_bonus, order_index]
+            'INSERT INTO questions (quiz_id, type, text, time_limit, speed_bonus, order_index, image_path, audio_path) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING * ',
+            [id, type, text, time_limit, speed_bonus, order_index, image_path, audio_path]
         )
 
         const question = questionResult.rows[0]
 
-        if (answers && answers.length > 0) {
-            for (const answer of answers) {
+        if (parsedAnswers && parsedAnswers.length > 0) {
+            for (const answer of parsedAnswers) {
                 await pool.query(
                     'INSERT INTO answers (question_id, text, is_correct) VALUES ($1, $2, $3)',
                     [question.id, answer.text, answer.is_correct]
@@ -107,14 +111,17 @@ router.post('/:id/questions', requireAuth, requireRole('host', 'admin'), async (
 })
 
 
-router.put('/:quizId/questions/:questionId', requireAuth, requireRole('host', 'admin'), async (req, res) => {
+router.put('/:quizId/questions/:questionId', requireAuth, requireRole('host', 'admin'), upload.fields([{ name: 'image' }, { name: 'audio' }]), async (req,
+    res) => {
     const { questionId } = req.params
     const { type, text, time_limit, speed_bonus, order_index, answers } = req.body
+    const image_path = req.files?.image ? req.files.image[0].path : null
+    const audio_path = req.files?.audio ? req.files.audio[0].path : null
 
     try {
         const result = await pool.query(
-            'UPDATE questions SET type=$1, text=$2, time_limit=$3, speed_bonus=$4, order_index=$5 WHERE id=$6 RETURNING *',
-            [type, text, time_limit, speed_bonus, order_index, questionId]
+            'UPDATE questions SET type=$1, text=$2, time_limit=$3, speed_bonus=$4, order_index=$5, image_path=$6, audio_path=$7 WHERE id=$8 RETURNING *',
+            [type, text, time_limit, speed_bonus, order_index, image_path, audio_path, questionId]
         )
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Spørsmål ikke funnet' })

@@ -3,12 +3,12 @@ const app = express()
 const PORT = 3000
 const pool = require('./db')
 
-
-app.use(express.json())
-
 const authRoutes = require('./routes/auth')
 const quizRoutes = require('./routes/quiz')
 
+
+app.use(express.json())
+app.use('/uploads', express.static('uploads'))
 app.use('/auth', authRoutes)
 app.use('/quizzes', quizRoutes)
 
