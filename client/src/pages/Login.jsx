@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../api'
 
 function Login() {
     const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
+    const navigate = useNavigate()
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -27,6 +29,9 @@ function Login() {
                 <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Passord" type="password" />
                 <button type="submit">Logg inn</button>
             </form>
+            <hr />
+            <p>Er du spiller?</p>
+            <button onClick={() => navigate('/play')}>Bli med i quiz</button>
         </div>
     )
 }

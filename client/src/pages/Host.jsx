@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
+import socket from '../socket'
+import { useNavigate } from 'react-router-dom'
 
 function Host() {
     const [quizzes, setQuizzes] = useState([])
+    const navigate = useNavigate()
 
-    
+
 
     const [newTitle, setNewTitle] = useState('')
 
@@ -14,6 +17,13 @@ function Host() {
         const user = JSON.parse(localStorage.getItem('user'))
         setQuizzes([{ ...res.data, created_by_username: user.username }, ...quizzes])
         setNewTitle('')
+    }
+
+    const startQuiz = (quizId) => {
+        socket.emit('host:create', { quizId })
+        socket.once('host:created', ({ roomCode }) => {
+            navigate(`/host/live/${roomCode}`)
+        })
     }
 
     useEffect(() => {
@@ -38,7 +48,7 @@ function Host() {
                     <h3>{quiz.title}</h3>
                     <p>Laget av: {quiz.created_by_username}</p>
                     <button onClick={() => window.location.href = `/quiz/${quiz.id}/edit`}>Rediger</button>
-                    <button>Start quiz</button>
+                    <button onClick={() => startQuiz(quiz.id)}>Start quiz</button>
                 </div>
             ))}
         </div>

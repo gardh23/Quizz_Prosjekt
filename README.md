@@ -121,11 +121,13 @@ Vi starter med **backend**, deretter frontend, så kobler vi alt sammen med Sock
 - [x] Innloggingsside
 - [x] Hostmeny: se alle quizer, opprett ny
 - [x] Quiz-editor: legg til spørsmål (flervalg og fritekst), slett spørsmål, tidsbegrensning, hastighetsbonus
-- [ ] Start quiz fra hostmeny — Socket.io-integrasjon
-- [ ] Spillermeny: bli med i quiz via romkode
-- [ ] Live spillvisning: spørsmål, timer, svaralternativer / fritekstfelt
-- [ ] Host live-visning: se spillere, neste spørsmål, overstyr timer, vurder fritekst
-- [ ] Leaderboard-visning mellom spørsmål
+- [x] Start quiz fra hostmeny — Socket.io-integrasjon
+- [x] Spillerside: bli med i quiz via romkode uten innlogging
+- [x] Live spillvisning: spørsmål, svaralternativer, fritekstfelt, poeng og rangering etter hvert spørsmål
+- [x] Host live-visning: se spillere, neste spørsmål, overstyr timer
+- [x] Leaderboard mellom spørsmål og sluttresultat
+- [x] Login-side med "Bli med i quiz"-knapp for spillere uten konto
+- [ ] Fritekst: host vurderer svar manuelt live
 - [ ] Admin-panel: administrer brukere og roller
 - [ ] Kahoot-inspirert visuell stil
 
@@ -141,4 +143,4 @@ Vi starter med **backend**, deretter frontend, så kobler vi alt sammen med Sock
 
 ## Neste steg
 
-**Start her:** Fortsett Fase 4 — koble "Start quiz"-knappen til Socket.io, deretter spillerside og live quiz-visning.
+**Start her:** Fortsett Fase 4 — fritekst-vurdering for host, deretter admin-panel og visuell styling (Kahoot-inspirert).

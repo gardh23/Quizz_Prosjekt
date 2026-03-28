@@ -75,7 +75,7 @@ module.exports = function (io) {
             session.status = 'active'
             session.currentQuestion = 0
 
-            const question = session.questions[0]
+            const question = session.questions[session.currentQuestion]
             io.to(roomCode).emit('session:question', { question, index: 0, total: session.questions.length })
         })
 
@@ -94,7 +94,6 @@ module.exports = function (io) {
             }
 
             const question = session.questions[session.currentQuestion]
-
             if (player.answers[question.id]) {
                 socket.emit('error', { message: 'Du har allerede svart' })
                 return
@@ -112,7 +111,6 @@ module.exports = function (io) {
 
             player.answers[question.id] = { answerId, isCorrect, points }
             player.score += points
-
             socket.emit('player:answer_result', { isCorrect, points })
             io.to(roomCode).emit('session:players', { players: Object.values(session.players) })
         })

@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import QuizEditor from './pages/QuizEditor'
+import HostLive from './pages/HostLive'
+import Play from './pages/Play'
 import Login from './pages/Login'
 import Host from './pages/Host'
 
@@ -18,6 +20,8 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/host" element={<Host />} />
         <Route path="/quiz/:id/edit" element={<QuizEditor />} />
+        <Route path="/play" element={<Play />} /> 
+        <Route path="/host/live/:roomCode" element={<HostLive />} />
       </Routes>
     </BrowserRouter>
   )
