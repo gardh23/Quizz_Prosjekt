@@ -3,7 +3,6 @@ const router = express.Router()
 const bcrypt = require('bcrypt')
 const pool = require('../db')
 const JWT_SECRET = process.env.JWT_SECRET
-// DIsse ska flyttes til .env fil aldri hardkodes noe annet sted
 const jwt = require('jsonwebtoken')
 
 router.post('/register', async (req, res) => {

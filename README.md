@@ -58,6 +58,7 @@ Quizz/
 │   ├── middleware/
 │   │   ├── auth.js      # requireAuth (JWT-verifisering) + requireRole(...roles)
 │   │   └── upload.js    # multer-konfig: jpg/png/mp3, maks 10MB, lagres i uploads/
+│   ├── socket.js        # All Socket.io-logikk: spilløkter, svar, poeng, leaderboard
 │   └── uploads/         # Opplastede bilde- og lydfiler (ikke versjonskontrollert)
 └── README.md
 ```
@@ -103,14 +104,16 @@ Vi starter med **backend**, deretter frontend, så kobler vi alt sammen med Sock
 - [x] Filhåndtering: opplasting av bilde/lyd per spørsmål med MIME-type validering og filstørrelsesbegrensning (multer, maks 10MB, jpg/png/mp3)
 
 ### FASE 3 — Sanntidslogikk med Socket.io
-**Status: Ikke påbegynt**
+**Status: Ferdig**
 
-- [ ] Spilløkt: host starter en quiz, spillere joiner via en romkode
-- [ ] Host styrer flyten: neste spørsmål, avslutt tidtaker, overstyr timer
-- [ ] Spillere sender inn svar i sanntid
-- [ ] For fritekst: host ser alle svar og markerer rett/galt live
-- [ ] Poengberegning (med og uten hastighetsbonus)
-- [ ] Leaderboard sendes til alle etter hvert spørsmål
+- [x] Spilløkt: host starter en quiz, spillere joiner via en romkode
+- [x] Host styrer flyten: neste spørsmål, overstyr timer
+- [x] Spillere sender inn svar i sanntid
+- [x] Poengberegning (med og uten hastighetsbonus)
+- [x] Leaderboard sendes til alle etter hvert spørsmål
+- [x] Disconnect-håndtering: spillere markeres frakoblet, host fryser quizen
+- [x] Reconnect: spillere og host kan koble til igjen og fortsette
+- [ ] For fritekst: host ser alle svar og markerer rett/galt live (tas i Fase 4)
 
 ### FASE 4 — Frontend
 **Status: Ikke påbegynt**
@@ -136,4 +139,4 @@ Vi starter med **backend**, deretter frontend, så kobler vi alt sammen med Sock
 
 ## Neste steg
 
-**Start her:** Fase 3 — installer `socket.io`, sett opp spilløkt med romkode, host-styring og sanntidskommunikasjon mellom spillere.
+**Start her:** Fase 4 — frontend med React. Begynn med innloggingssiden, deretter host- og spillerflyt.
