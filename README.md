@@ -116,15 +116,17 @@ Vi starter med **backend**, deretter frontend, så kobler vi alt sammen med Sock
 - [ ] For fritekst: host ser alle svar og markerer rett/galt live (tas i Fase 4)
 
 ### FASE 4 — Frontend
-**Status: Ikke påbegynt**
+**Status: Påbegynt**
 
-- [ ] Innloggingsside
-- [ ] Spillermeny: bli med i quiz via kode
-- [ ] Hostmeny: se alle quizer, opprett ny, start quiz
-- [ ] Admin-panel: administrer brukere og roller
-- [ ] Quiz-editor: legg til spørsmål, velg type, sett tidsbegrensning, toggle hastighetsbonus
+- [x] Innloggingsside
+- [x] Hostmeny: se alle quizer, opprett ny
+- [x] Quiz-editor: legg til spørsmål (flervalg og fritekst), slett spørsmål, tidsbegrensning, hastighetsbonus
+- [ ] Start quiz fra hostmeny — Socket.io-integrasjon
+- [ ] Spillermeny: bli med i quiz via romkode
 - [ ] Live spillvisning: spørsmål, timer, svaralternativer / fritekstfelt
+- [ ] Host live-visning: se spillere, neste spørsmål, overstyr timer, vurder fritekst
 - [ ] Leaderboard-visning mellom spørsmål
+- [ ] Admin-panel: administrer brukere og roller
 - [ ] Kahoot-inspirert visuell stil
 
 ### FASE 5 — Deploy
@@ -139,4 +141,4 @@ Vi starter med **backend**, deretter frontend, så kobler vi alt sammen med Sock
 
 ## Neste steg
 
-**Start her:** Fase 4 — frontend med React. Begynn med innloggingssiden, deretter host- og spillerflyt.
+**Start her:** Fortsett Fase 4 — koble "Start quiz"-knappen til Socket.io, deretter spillerside og live quiz-visning.

@@ -1,4 +1,5 @@
 require('dotenv').config()
+const cors = require('cors')
 const express = require('express')
 const http = require('http')
 const { Server } = require('socket.io')
@@ -14,6 +15,7 @@ const authRoutes = require('./routes/auth')
 const quizRoutes = require('./routes/quiz')
 
 app.use(express.json())
+app.use(cors({ origin: 'http://localhost:5173' }))
 app.use('/uploads', express.static('uploads'))
 app.use('/auth', authRoutes)
 app.use('/quizzes', quizRoutes)
