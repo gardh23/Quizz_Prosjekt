@@ -4,8 +4,15 @@ const bcrypt = require('bcrypt')
 const pool = require('../db')
 const JWT_SECRET = process.env.JWT_SECRET
 const jwt = require('jsonwebtoken')
+const rateLimit = require('express-rate-limit')
 
-router.post('/register', async (req, res) => {
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { error: 'For mange forsøk — prøv igjen om 15 minutter' }
+})
+
+router.post('/register', authLimiter, async (req, res) => {
     const { username, password } = req.body
 
     try {
@@ -28,7 +35,7 @@ router.post('/register', async (req, res) => {
     }
 })
 
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
     const { username, password } = req.body
 
     try {

@@ -7,6 +7,10 @@ module.exports = function (io) {
         console.log('Bruker koblet til:', socket.id)
 
         socket.on('host:create', async ({ quizId }) => {
+            if (!socket.user || (socket.user.role !== 'host' && socket.user.role !== 'admin')) {
+                socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
             try {
                 const result = await pool.query('SELECT * FROM quizzes WHERE id = $1', [quizId])
                 if (result.rows.length === 0) {
@@ -34,6 +38,11 @@ module.exports = function (io) {
         })
 
         socket.on('player:join', ({ roomCode, username }) => {
+            if (!username || typeof username !== 'string' || username.trim().length === 0 || username.length > 30) {
+                socket.emit('error', { message: 'Ugyldig brukernavn (maks 30 tegn)' })
+                return
+            }
+
             const session = sessions[roomCode]
 
             if (!session) {
@@ -47,7 +56,7 @@ module.exports = function (io) {
             }
 
             session.players[socket.id] = {
-                username,
+                username: username.trim(),
                 score: 0,
                 answers: {}
             }
@@ -58,7 +67,11 @@ module.exports = function (io) {
             console.log(`${username} joined ${roomCode}`)
         })
 
-        socket.on('host:start', async ({ roomCode }) => {
+        socket.on('host:start', async ({ roomCode, speedBonus }) => {
+            if (!socket.user || (socket.user.role !== 'host' && socket.user.role !== 'admin')) {
+                socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
             const session = sessions[roomCode]
 
             if (!session || session.host !== socket.id) {
@@ -72,6 +85,7 @@ module.exports = function (io) {
             )
 
             session.questions = questionsResult.rows
+            session.speedBonus = speedBonus || false
             session.status = 'active'
             session.currentQuestion = 0
 
@@ -79,7 +93,7 @@ module.exports = function (io) {
             io.to(roomCode).emit('session:question', { question, index: 0, total: session.questions.length })
         })
 
-        socket.on('player:answer', ({ roomCode, answerId, timeUsed }) => {
+        socket.on('player:answer', ({ roomCode, answerId, timeUsed, freeTextResponse }) => {
             const session = sessions[roomCode]
 
             if (!session || session.status !== 'active') {
@@ -100,22 +114,40 @@ module.exports = function (io) {
             }
 
             const answer = question.answers.find(a => a.id === answerId)
-            const isCorrect = answer?.is_correct || false
+            const isCorrect = question.type === 'free_text' ? false : (answer?.is_correct || false)
 
             let points = 0
             if (isCorrect) {
-                points = question.speed_bonus
+                points = session.speedBonus
                     ? Math.round(1000 * (1 - timeUsed / (question.time_limit * 1000)))
                     : 500
             }
 
-            player.answers[question.id] = { answerId, isCorrect, points }
+            player.answers[question.id] = { answerId, isCorrect, points, timeUsed }
             player.score += points
             socket.emit('player:answer_result', { isCorrect, points })
+            if (question.type === 'free_text') {
+                const hostSocket = io.sockets.sockets.get(session.host)
+                if (hostSocket) {
+                    const safeResponse = typeof freeTextResponse === 'string'
+                        ? freeTextResponse.slice(0, 100)
+                        : ''
+                    hostSocket.emit('host:free_text_answer', {
+                        playerId: socket.id,
+                        username: player.username,
+                        answer: safeResponse,
+                        questionId: question.id
+                    })
+                }
+            }
             io.to(roomCode).emit('session:players', { players: Object.values(session.players) })
         })
 
         socket.on('host:next', ({ roomCode }) => {
+            if (!socket.user || (socket.user.role !== 'host' && socket.user.role !== 'admin')) {
+                socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
             const session = sessions[roomCode]
 
             if (!session || session.host !== socket.id) {
@@ -145,6 +177,10 @@ module.exports = function (io) {
         })
 
         socket.on('host:set_timer', ({ roomCode, seconds }) => {
+            if (!socket.user || (socket.user.role !== 'host' && socket.user.role !== 'admin')) {
+                socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
             const session = sessions[roomCode]
 
             if (!session || session.host !== socket.id) {
@@ -153,6 +189,40 @@ module.exports = function (io) {
             }
 
             io.to(roomCode).emit('session:timer_override', { seconds })
+        })
+
+        socket.on('host:grade', ({ roomCode, playerId, isCorrect }) => {
+            if (!socket.user || (socket.user.role !== 'host' && socket.user.role !== 'admin')) {
+                socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
+            const session = sessions[roomCode]
+
+            if (!session || session.host !== socket.id) {
+                socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
+
+            const player = session.players[playerId]
+            if (!player) return
+
+            const question = session.questions[session.currentQuestion]
+            const points = isCorrect
+                ? session.speedBonus
+                    ? Math.round(1000 * (1 - player.answers[question.id].timeUsed / (question.time_limit * 1000)))
+                    : 500
+                : 0
+
+            player.answers[question.id].isCorrect = isCorrect
+            player.answers[question.id].points = points
+            player.score += points
+
+            const playerSocket = io.sockets.sockets.get(playerId)
+            if (playerSocket) {
+                playerSocket.emit('player:answer_result', { isCorrect, points })
+            }
+
+            io.to(roomCode).emit('session:players', { players: Object.values(session.players) })
         })
 
 

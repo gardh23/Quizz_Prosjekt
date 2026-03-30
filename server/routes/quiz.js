@@ -5,12 +5,12 @@ const { requireAuth, requireRole } = require('../middleware/auth')
 const upload = require('../middleware/upload')
 
 router.post('/', requireAuth, requireRole('host', 'admin'), async (req, res) => {
-    const { title } = req.body
+    const { title, speed_bonus } = req.body
 
     try {
         const result = await pool.query(
-            'INSERT INTO quizzes (title, created_by) VALUES ($1, $2) RETURNING *',
-            [title, req.user.id]
+            'INSERT INTO quizzes (title, created_by, speed_bonus) VALUES ($1, $2, $3) RETURNING *',
+            [title, req.user.id, speed_bonus || false]
         )
         res.status(201).json(result.rows[0])
     } catch (err) {
@@ -64,14 +64,44 @@ router.get('/:id', requireAuth, async (req, res) => {
     }
 })
 
+router.put('/:id', requireAuth, requireRole('host', 'admin'), async (req, res) => {
+    const { id } = req.params
+    const { title } = req.body
+
+    try {
+        const quizResult = await pool.query('SELECT created_by FROM quizzes WHERE id = $1', [id])
+        if (quizResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Quiz ikke funnet' })
+        }
+        if (req.user.role !== 'admin' && quizResult.rows[0].created_by !== req.user.id) {
+            return res.status(403).json({ error: 'Du kan bare redigere dine egne quizer' })
+        }
+
+        const result = await pool.query(
+            'UPDATE quizzes SET title = $1 WHERE id = $2 RETURNING *',
+            [title, id]
+        )
+        res.json(result.rows[0])
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: 'Noe gikk galt' })
+    }
+})
+
 router.delete('/:id', requireAuth, requireRole('host', 'admin'), async (req, res) => {
     const { id } = req.params
 
     try {
-        const result = await pool.query('DELETE FROM quizzes WHERE id = $1 RETURNING id', [id])
-        if (result.rows.length === 0) {
+        const quizResult = await pool.query('SELECT created_by FROM quizzes WHERE id = $1', [id])
+        if (quizResult.rows.length === 0) {
             return res.status(404).json({ error: 'Quiz ikke funnet' })
         }
+
+        if (req.user.role !== 'admin' && quizResult.rows[0].created_by !== req.user.id) {
+            return res.status(403).json({ error: 'Du kan bare slette dine egne quizer' })
+        }
+
+        await pool.query('DELETE FROM quizzes WHERE id = $1', [id])
         res.json({ message: 'Quiz slettet' })
     } catch (err) {
         console.error(err)
@@ -81,15 +111,15 @@ router.delete('/:id', requireAuth, requireRole('host', 'admin'), async (req, res
 
 router.post('/:id/questions', requireAuth, requireRole('host', 'admin'), upload.fields([{ name: 'image' }, { name: 'audio' }]), async (req, res) => {
     const { id } = req.params
-    const { type, text, time_limit, speed_bonus, order_index, answers } = req.body
+    const { type, text, time_limit, order_index, answers, image_width } = req.body
     const parsedAnswers = typeof answers === 'string' ? JSON.parse(answers) : answers
     const image_path = req.files?.image ? req.files.image[0].path : null
     const audio_path = req.files?.audio ? req.files.audio[0].path : null
 
     try {
         const questionResult = await pool.query(
-            'INSERT INTO questions (quiz_id, type, text, time_limit, speed_bonus, order_index, image_path, audio_path) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING * ',
-            [id, type, text, time_limit, speed_bonus, order_index, image_path, audio_path]
+            'INSERT INTO questions (quiz_id, type, text, time_limit, order_index, image_path, audio_path, image_width) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+            [id, type, text, time_limit, order_index, image_path, audio_path, image_width || 100]
         )
 
         const question = questionResult.rows[0]
@@ -114,22 +144,23 @@ router.post('/:id/questions', requireAuth, requireRole('host', 'admin'), upload.
 router.put('/:quizId/questions/:questionId', requireAuth, requireRole('host', 'admin'), upload.fields([{ name: 'image' }, { name: 'audio' }]), async (req,
     res) => {
     const { questionId } = req.params
-    const { type, text, time_limit, speed_bonus, order_index, answers } = req.body
+    const { type, text, time_limit, order_index, answers, image_width } = req.body
+    const parsedAnswers = typeof answers === 'string' ? JSON.parse(answers) : answers
     const image_path = req.files?.image ? req.files.image[0].path : null
     const audio_path = req.files?.audio ? req.files.audio[0].path : null
 
     try {
         const result = await pool.query(
-            'UPDATE questions SET type=$1, text=$2, time_limit=$3, speed_bonus=$4, order_index=$5, image_path=$6, audio_path=$7 WHERE id=$8 RETURNING *',
-            [type, text, time_limit, speed_bonus, order_index, image_path, audio_path, questionId]
+            'UPDATE questions SET type=$1, text=$2, time_limit=$3, order_index=$4, image_path=COALESCE($5, image_path), audio_path=COALESCE($6, audio_path), image_width=$7 WHERE id=$8 RETURNING *',
+            [type, text, time_limit, order_index, image_path, audio_path, image_width || 100, questionId]
         )
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Spørsmål ikke funnet' })
         }
 
-        if (answers && answers.length > 0) {
+        if (parsedAnswers && parsedAnswers.length > 0) {
             await pool.query('DELETE FROM answers WHERE question_id = $1', [questionId])
-            for (const answer of answers) {
+            for (const answer of parsedAnswers) {
                 await pool.query(
                     'INSERT INTO answers (question_id, text, is_correct) VALUES ($1, $2, $3)',
                     [questionId, answer.text, answer.is_correct]

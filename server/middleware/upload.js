@@ -12,8 +12,11 @@ const storage = multer.diskStorage({
 })
 
 const fileFilter = function (req, file, cb) {
-    const allowed = ['image/jpeg', 'image/png', 'audio/mpeg']
-    if (allowed.includes(file.mimetype)) {
+    const allowedMimes = ['image/jpeg', 'image/png', 'audio/mpeg', 'audio/mp3']
+    const allowedExts = ['.jpg', '.jpeg', '.png', '.mp3']
+    const ext = path.extname(file.originalname).toLowerCase()
+
+    if (allowedMimes.includes(file.mimetype) && allowedExts.includes(ext)) {
         cb(null, true)
     } else {
         cb(new Error('Kun jpg, png og mp3 er tillatt'), false)
