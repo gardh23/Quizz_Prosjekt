@@ -2,12 +2,7 @@
 
 Kahoot-inspirert quiz-applikasjon med støtte for flervalg og fritekst-svar.
 
-## Tech Stack
-- **Frontend**: React + Vite + Tailwind CSS v4
-- **Backend**: Node.js + Express
-- **Real-time**: Socket.io
-- **Database**: PostgreSQL
-- **Deploy**: NGINX på DigitalOcean droplet
+**Live:** https://gardh23.eu/quiz/
 
 ---
 
@@ -20,6 +15,17 @@ Kahoot-inspirert quiz-applikasjon med støtte for flervalg og fritekst-svar.
 - **Ikke rediger kode direkte** med mindre brukeren eksplisitt sier "du kan gjøre denne endringen for meg" eller "gjør det du" — vis hva som skal endres og la brukeren gjøre det selv
 - **Hvis brukeren gir nye instrukser eller preferanser underveis, oppdater alltid denne README-filen slik at neste Claude-sesjon forstår dem**
 - **I deploy-fasen gjør brukeren ALT selv** — Claude forklarer hva som skal gjøres og hvorfor, men skriver ingen kommandoer direkte inn i terminalen for brukeren. Forklar sikkerhetsbegrunnelsen bak hvert steg.
+
+---
+
+## Tech Stack
+
+- **Frontend**: React + Vite + Tailwind CSS v4
+- **Backend**: Node.js + Express
+- **Real-time**: Socket.io
+- **Database**: PostgreSQL
+- **Deploy**: NGINX + PM2 på DigitalOcean droplet (Ubuntu)
+- **HTTPS**: Let's Encrypt via Certbot
 
 ---
 
@@ -42,36 +48,37 @@ En quiz-app som ligner Kahoot, med følgende særtrekk:
 
 ---
 
-## Filstruktur (nåværende)
+## Filstruktur
 
 ```
 Quizz/
 ├── client/              # React + Vite frontend
+│   ├── vite.config.js            # base: '/quiz/' for substi-deploy
 │   └── src/
-│       ├── App.jsx               # Router + Home (videresender basert på rolle)
-│       ├── api.js                # Axios-instans med base URL og JWT-interceptor
-│       ├── socket.js             # Delt Socket.io-klientinstans
+│       ├── App.jsx               # Router med basename="/quiz" + Home (videresender basert på rolle)
+│       ├── api.js                # Axios-instans + mediaBase for miljøhåndtering
+│       ├── socket.js             # Delt Socket.io-klientinstans med JWT
 │       ├── components/
 │       │   └── UserBadge.jsx     # Viser innlogget bruker + rolle + logg ut (fast øverst til høyre)
 │       └── pages/
 │           ├── Login.jsx         # Innloggingsside + "Bli med i quiz"-knapp
 │           ├── Host.jsx          # Hostmeny: se/opprett/slett quizer, start quiz
-│           ├── QuizEditor.jsx    # Legg til/rediger/slett spørsmål (flervalg + fritekst)
-│           ├── HostLive.jsx      # Host sin live-visning: spillere, svar-status, fritekstvurdering
-│           ├── Play.jsx          # Spillerside: bli med, svar på spørsmål, leaderboard
+│           ├── QuizEditor.jsx    # Legg til/rediger/slett spørsmål (flervalg + fritekst + bilde/lyd)
+│           ├── HostLive.jsx      # Host sin live-visning: timer, spillere, svar-status, fritekstvurdering
+│           ├── Play.jsx          # Spillerside: bli med, svar på spørsmål, custom audio-spiller
 │           └── Admin.jsx         # Admin-panel: endre roller, slett brukere
 ├── server/
-│   ├── index.js         # Express-server, Socket.io middleware (JWT), CORS, alle ruter
-│   ├── db.js            # PostgreSQL Pool-tilkobling
+│   ├── index.js         # Express-server, auto-opprett uploads/, Socket.io JWT-middleware
+│   ├── db.js            # PostgreSQL Pool-tilkobling via env-variabler
 │   ├── socket.js        # All Socket.io spilløkt-logikk
 │   ├── routes/
 │   │   ├── auth.js      # POST /auth/register og /auth/login (rate limited)
-│   │   ├── quiz.js      # CRUD for quizer og spørsmål, inkl. filopplasting
+│   │   ├── quiz.js      # CRUD for quizer og spørsmål, inkl. filopplasting og image_width
 │   │   └── admin.js     # GET/PUT/DELETE /admin/users (kun admin)
 │   ├── middleware/
 │   │   ├── auth.js      # requireAuth (JWT-verifisering) + requireRole(...roles)
-│   │   └── upload.js    # multer-konfig: jpg/png/mp3, maks 10MB, validerer MIME + filendelse
-│   └── uploads/         # Opplastede bilde- og lydfiler (ikke versjonskontrollert)
+│   │   └── upload.js    # multer-konfig: jpg/png/mp3+audio/mp3, maks 10MB, validerer MIME + filendelse
+│   └── uploads/         # Opplastede bilde- og lydfiler (ikke versjonskontrollert, kun .gitkeep)
 └── README.md
 ```
 
@@ -83,11 +90,12 @@ Quizz/
 users         — id, username, password_hash, role (admin/host/player)
 quizzes       — id, title, created_by (FK users), created_at, speed_bonus (BOOLEAN)
 questions     — id, quiz_id (FK), type (multiple_choice/free_text), text,
-                time_limit, order_index, image_path, audio_path
+                time_limit, order_index, image_path, audio_path, image_width (INTEGER DEFAULT 100)
 answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 ```
 
-- `speed_bonus` ligger på quiz-nivå (ikke per spørsmål) og settes i lobbyen
+- `speed_bonus` ligger på quiz-nivå og settes i lobbyen
+- `image_width` er INTEGER 10–100, styrer visningsbredde i prosent
 - For fritekst lagres én answer-rad med fasit (is_correct = true)
 
 ---
@@ -131,78 +139,111 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 - **speed_bonus per quiz**: Defineres i lobbyen av host, sendes med `host:start`, lagres i `session.speedBonus`
 - **Disconnect-håndtering**: Host-frakobling fryser quizen, spillere markeres `connected: false`
 - **Reconnect**: Spillere matcher på username, host matcher på romkode
-- **JSON.parse av answers**: FormData sender alt som strings — `parsedAnswers` håndterer dette i begge PUT og POST
+- **JSON.parse av answers**: FormData sender alt som strings — `parsedAnswers` håndterer dette i PUT og POST
 - **Socket.io autentisering**: JWT sendes via `socket.handshake.auth.token`, host-hendelser krever rolle `host`/`admin`
 - **Rate limiting**: Login og register begrenset til 10 forsøk per 15 min per IP
 - **Input-validering socket**: `username` maks 30 tegn, `freeTextResponse` maks 100 tegn
-- **Quiz-eierskap**: Host kan bare slette egne quizer — admin kan slette alle
-- **Filopplasting**: Både MIME-type og filendelse valideres
-- **Svar-status live**: Host ser hvem som har/ikke har svart under hvert spørsmål (grønn/grå)
-- **Fasit for host**: Riktig(e) svar vises i grønt under spørsmålsteksten i HostLive
-- **Timer**: `startTimer(seconds)` bruker `setInterval` + `useRef` i Play og HostLive — nullstilles ved nytt spørsmål, kan overstyres av host med `host:set_timer`
-- **Custom audio-spiller**: Native `<audio>` uten `controls`, styrt via `useRef` — kun play/pause og volum eksponert for spiller
+- **Quiz-eierskap**: Host kan bare slette/redigere egne quizer — admin kan gjøre det for alle
+- **Filopplasting**: Både MIME-type og filendelse valideres, `audio/mp3` hvitelistet i tillegg til `audio/mpeg`
 - **uploads/-mappen**: Opprettes automatisk ved serveroppstart via `fs.mkdirSync('uploads', { recursive: true })`
 - **COALESCE ved spørsmålsoppdatering**: PUT-ruten bruker `COALESCE($5, image_path)` for å beholde eksisterende bilde/lyd hvis ingen ny fil lastes opp
-- **image_width**: Lagres som INTEGER (10–100) i `questions`-tabellen, brukes som `style={{ width: imageWidth% }}` — begge Play og QuizEditor preview er begrenset til `max-w-2xl` for at % skal matche
-- **Quiz-tittel redigering**: PUT `/quizzes/:id` med samme eierskapssjekk som DELETE
-- **audio/mp3 MIME-type**: Hvitelistet i tillegg til `audio/mpeg` da noen nettlesere sender denne varianten
+- **image_width**: Slider med live preview i QuizEditor, begge Play og preview begrenset til `max-w-2xl` for at % skal matche
+- **Timer**: `startTimer(seconds)` bruker `setInterval` + `useRef` — nullstilles ved nytt spørsmål, rød ved ≤ 10 sek, blokkerer svar ved 0
+- **Custom audio-spiller**: Native `<audio>` uten `controls`, styrt via `useRef` — kun play/pause og volum eksponert for spiller
+- **mediaBase**: Eksportert fra `api.js` — `''` i produksjon, `'http://localhost:3000'` lokalt — brukes for alle bilde/lyd-URLer
+- **Login redirect**: Bruker `navigate('/')` fra React Router (ikke `window.location.href`) for å respektere `basename="/quiz"`
+
+---
+
+## Produksjonsoppsett (DigitalOcean)
+
+### Server
+- **Droplet**: Ubuntu, IP `104.248.81.228`, domene `gardh23.eu`
+- **Bruker**: `gard` (sudo, ikke root)
+- **Brannmur**: `ufw` — kun port 22, 80, 443 åpne
+- **Node.js**: v22 (installert via NodeSource)
+- **PostgreSQL**: Lokal installasjon, kun tilgjengelig internt
+- **NGINX**: v1.24, håndterer HTTPS og reverse proxy
+- **PM2**: Kjører Express som systemtjeneste, starter automatisk ved reboot
+- **HTTPS**: Let's Encrypt via Certbot (allerede satt opp for gardh23.eu)
+
+### Prosjektplassering
+```
+/home/gard/Quizz_Prosjekt/
+├── client/dist/          # Bygget React-app (genereres med npm run build)
+└── server/
+    ├── .env              # Hemmeligheter (chmod 600, ikke i git)
+    └── uploads/          # Opplastede filer
+```
+
+### NGINX-konfig (`/etc/nginx/sites-available/gardh23.eu`)
+```nginx
+location /quiz/ {
+    alias /home/gard/Quizz_Prosjekt/client/dist/;
+    try_files $uri $uri/ /quiz/index.html;
+}
+location /socket.io/ {
+    proxy_pass http://localhost:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+}
+location ~ ^/(auth|quizzes|admin|uploads) {
+    proxy_pass http://localhost:3000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+client_max_body_size 10M;
+```
+
+### Database
+- **Navn**: `quizz_db`
+- **Bruker**: `quizz_user` — kun rettigheter til `quizz_db` (ikke superuser)
+- Opprettet admin-bruker direkte i DB med bcrypt-hash
+
+### Deploy-prosedyre ved oppdatering
+```bash
+# På Mac:
+git push
+
+# På serveren:
+cd ~/Quizz_Prosjekt
+git pull
+cd client
+npm run build
+# (server trenger ikke restart med mindre server/-kode er endret)
+# Hvis server/-kode er endret:
+cd ~/Quizz_Prosjekt/server && pm2 restart quizz
+```
+
+### Sikkerhetsprinsipper
+- Minste privilegium: `quizz_user` har kun tilgang til `quizz_db`
+- Ingen hemmeligheter i git — `.env` er i `.gitignore` og har `chmod 600`
+- Express (port 3000) er ikke eksponert mot internett — kun NGINX snakker med den
+- HTTPS tvunget — HTTP redirecter til HTTPS via Certbot
+- Brannmur blokkerer alle porter unntatt 22, 80, 443
 
 ---
 
 ## Byggeplan
 
-### FASE 1 — Database og brukermodell
-**Status: Ferdig**
+### FASE 1–4: Ferdig
+### FASE 5 — Deploy: Ferdig
 
-### FASE 2 — Quiz-modell og API
-**Status: Ferdig**
-
-### FASE 3 — Sanntidslogikk med Socket.io
-**Status: Ferdig**
-
-### FASE 4 — Frontend + forbedringer
-**Status: Ferdig**
-
-- [x] Alle sider stylet med Tailwind CSS v4 (Kahoot-inspirert)
-- [x] UserBadge-komponent på alle innloggede sider
-- [x] Admin-panel: endre roller, slett brukere (med bekreftelse)
-- [x] Host kan slette quiz (med bekreftelse, kun egne)
-- [x] QuizEditor: rediger eksisterende spørsmål
-- [x] Host ser hvem som har svart live
-- [x] Host ser fasit under spørsmålet
-- [x] Hastighetsbonus-toggle i lobbyen (ikke ved quiz-opprettelse)
-- [x] Sikkerhetsgjennomgang fullført
-- [x] Timer — nedtelling per spørsmål, synlig for host og spiller, rød ved ≤ 10 sek, blokkerer svar ved 0
-- [x] Bilde/lyd-grensesnitt i QuizEditor + visning i Play og HostLive
-- [x] Custom audio-spiller for spillere (kun play/pause + volum)
-- [x] Bildestørrelse per spørsmål — slider med live preview i QuizEditor, lagres som `image_width` i DB
-- [x] Tilbake-knapp i QuizEditor og HostLive-lobby
-- [x] Host kan endre navn på quiz direkte i QuizEditor
-
-### FASE 5 — Deploy
-**Status: Ikke påbegynt**
-
-**Sikkerhetsprinsipper for deploy:**
-- Minste privilegium: hver tjeneste/bruker skal bare ha tilgang til det den trenger
-- Ingen hemmeligheter i kode eller git — alt i .env-filer som ikke versjonskontrolleres
-- Angrepsflate: lukk alle porter som ikke er nødvendige
-- HTTPS påkrevd — ingen produksjonsdata over HTTP
-- Oppdaterte pakker og OS — kjente sårbarheter tettes
-
-**Steg:**
-- [ ] Sikre dropleten: oppdater OS, opprett ikke-root bruker, deaktiver root SSH-login, sett opp SSH-nøkkelautentisering, deaktiver passordinnlogging
-- [ ] Sett opp brannmur (ufw): kun port 22 (SSH), 80 (HTTP) og 443 (HTTPS) åpne
-- [ ] Installer Node.js, PostgreSQL og NGINX
-- [ ] Opprett dedikert PostgreSQL-bruker med kun nødvendige rettigheter (ikke superuser)
-- [ ] Sett opp .env for produksjon med sterke hemmeligheter (JWT_SECRET, DB-passord)
-- [ ] Bygg React-appen (`npm run build`) og server den som statiske filer via NGINX
-- [ ] Konfigurer NGINX som reverse proxy mot Express-serveren (kun intern tilgang til Express)
-- [ ] Sett opp HTTPS med Let's Encrypt (certbot) — aldri server over ren HTTP i prod
-- [ ] Kjør Express med PM2 (prosessmanager) — holder appen oppe og logger feil
-- [ ] Sett opp logging (f.eks. winston) for produksjonsfeil
+- [x] Sikret droplet med ikke-root bruker og SSH-nøkkel
+- [x] Brannmur konfigurert (ufw)
+- [x] Node.js 22, PostgreSQL, NGINX installert
+- [x] Dedikert PostgreSQL-bruker med begrensede rettigheter
+- [x] `.env` med sterke hemmeligheter, chmod 600
+- [x] React bygget og servet via NGINX på `/quiz/`
+- [x] NGINX reverse proxy mot Express
+- [x] HTTPS med Let's Encrypt
+- [x] PM2 med auto-start ved reboot
+- [x] Quiz-kort lagt til på portfolio-forsiden (gardh23.eu)
 
 ---
 
 ## Neste steg
 
-**Start her:** Deploy til DigitalOcean (Fase 5).
+Prosjektet er ferdig og i produksjon på https://gardh23.eu/quiz/
