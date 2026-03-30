@@ -1,5 +1,6 @@
 import socket from '../socket'
 import { useState, useEffect, useRef } from 'react'
+import { mediaBase } from '../api'
 
 function Play() {
     const [answered, setAnswered] = useState(false)
@@ -130,7 +131,7 @@ function Play() {
                     <h1 className="text-3xl font-bold text-white mt-2">{question.text}</h1>
                     {question.image_path && (
                         <img
-                            src={`http://localhost:3000/${question.image_path}`}
+                            src={`${mediaBase}/${question.image_path}`}
                             style={{ width: `${question.image_width || 100}%` }}
                             className="mx-auto mt-4 rounded-xl object-contain"
                         />
@@ -161,7 +162,7 @@ function Play() {
                             />
                             <audio
                                 ref={audioRef}
-                                src={`http://localhost:3000/${question.audio_path}`}
+                                src={`${mediaBase}/${question.audio_path}`}
                                 onEnded={() => setAudioPlaying(false)}
                             />
                         </div>

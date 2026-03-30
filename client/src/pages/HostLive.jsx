@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import socket from '../socket'
 import UserBadge from '../components/UserBadge'
+import { mediaBase } from '../api'
 
 function HostLive() {
     const { roomCode } = useParams()
@@ -148,13 +149,13 @@ function HostLive() {
                             </div>
                             {question.image_path && (
                                 <img
-                                    src={`http://localhost:3000/${question.image_path}`}
+                                    src={`${mediaBase}/${question.image_path}`}
                                     style={{ width: `${question.image_width || 100}%` }}
                                     className="mx-auto rounded-xl object-contain mb-3 mt-3"
                                 />
                             )}
                             {question.audio_path && (
-                                <audio controls src={`http://localhost:3000/${question.audio_path}`} className="w-full mb-3 mt-3" />
+                                <audio controls src={`${mediaBase}/${question.audio_path}`} className="w-full mb-3 mt-3" />
                             )}
                             <p className="text-gray-500 text-sm mb-2">
                                 {players.filter(p => p.answers && p.answers[question.id]).length} / {players.length} har svart

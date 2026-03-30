@@ -1,5 +1,7 @@
 import axios from 'axios'
 
+export const mediaBase = window.location.hostname === 'localhost' ? 'http://localhost:3000' : ''
+
 const api = axios.create({
     baseURL: window.location.hostname === 'localhost' ? 'http://localhost:3000' : '/'
 })

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import api from '../api'
+import api, { mediaBase } from '../api'
 import UserBadge from '../components/UserBadge'
 
 const emptyAnswers = [
@@ -218,7 +218,7 @@ function QuizEditor() {
                                     <div className="bg-purple-800 rounded-xl p-4 text-center">
                                         <p className="text-purple-200 text-sm mb-2">Forhåndsvisning</p>
                                         <img
-                                            src={imageFile ? URL.createObjectURL(imageFile) : `http://localhost:3000/${editingQuestion.image_path}`}
+                                            src={imageFile ? URL.createObjectURL(imageFile) : `${mediaBase}/${editingQuestion.image_path}`}
                                             style={{ width: `${imageWidth}%` }}
                                             className="mx-auto rounded-xl object-contain"
                                         />
@@ -230,7 +230,7 @@ function QuizEditor() {
                         <div className="flex flex-col gap-2">
                             <label className="text-gray-600 font-semibold">Lydfil (mp3)</label>
                             {editingQuestion?.audio_path && !audioFile && (
-                                <audio controls src={`http://localhost:3000/${editingQuestion.audio_path}`} className="w-full mb-1" />
+                                <audio controls src={`${mediaBase}/${editingQuestion.audio_path}`} className="w-full mb-1" />
                             )}
                             <input
                                 type="file"
