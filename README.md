@@ -39,7 +39,7 @@ En quiz-app som ligner Kahoot, med følgende særtrekk:
 - Fritekst-svar vurderes **manuelt av host** live
 - Host kan **overstyre tidtakeren live**
 - **Hastighetsbonus** defineres per quiz i lobbyen (ikke per spørsmål)
-- **Leaderboard** vises mellom hvert spørsmål
+- **Leaderboard** vises kun på slutten av quizen — nedtelling mellom spørsmål
 - **Innlogging påkrevd** for hosts og admin — spillere kan delta uten konto (bare brukernavn)
 - **Admin** styrer hvem som er host eller spiller, kan slette brukere
 - Hosts kan laste opp **bilde- og lydfiler** til spørsmål
@@ -105,25 +105,26 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 ### Host sender:
 - `host:create` → oppretter spilløkt med romkode
 - `host:start` → starter quiz med `speedBonus`-valg fra lobbyen
-- `host:next` → viser leaderboard og sender neste spørsmål (eller avslutter)
+- `host:next` → starter nedtelling og sender neste spørsmål automatisk (eller avslutter med leaderboard)
 - `host:set_timer` → overstyrer timer live
-- `host:grade` → vurderer fritekst-svar (isCorrect: true/false)
+- `host:grade` → vurderer fritekst-svar (isCorrect: true/false) — kun etter at timer er ute
 - `host:rejoin` → gjenkobler etter frakobling
 
 ### Spiller sender:
-- `player:join` → blir med i rom (ingen innlogging nødvendig)
-- `player:answer` → sender svar (answerId + timeUsed + freeTextResponse for fritekst)
-- `player:rejoin` → gjenkobler etter frakobling
+- `player:join` → blir med i rom; hvis samme brukernavn finnes og er frakoblet, behandles som rejoin
+- `player:answer` → sender svar (answerId + timeUsed + freeTextResponse for fritekst); fritekst kan sendes inn på nytt for å oppdatere
+- `player:rejoin` → gjenkobler etter frakobling (kun hvis spilleren er markert frakoblet)
 
 ### Server sender til rom:
 - `host:created` → romkode klar
 - `player:joined` → bekreftelse til spiller
+- `player:rejoined` → bekreftelse på rejoin med `{ score, status, question, timeRemaining }`
 - `session:players` → oppdatert spillerliste (inkl. answers for å vise hvem som har svart)
 - `session:question` → nytt spørsmål
-- `player:answer_result` → bekreftelse på svar (til spiller)
-- `host:free_text_answer` → fritekst-svar videresendt til host
-- `session:leaderboard` → leaderboard etter spørsmål
-- `session:finished` → quiz ferdig, endelig leaderboard
+- `session:countdown` → nedtelling mellom spørsmål `{ seconds: 5 }`
+- `player:answer_result` → bekreftelse på svar (til spiller); vises som flash-melding
+- `host:free_text_answer` → fritekst-svar videresendt til host (oppdaterer eksisterende ved re-innsending)
+- `session:finished` → quiz ferdig med endelig leaderboard (alle spillere + poeng)
 - `session:frozen` → host koblet fra, quiz fryst
 - `session:resumed` → host koblet til igjen
 
@@ -133,12 +134,20 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 
 - **Delt socket-instans**: `client/src/socket.js` eksporterer én instans — unngår doble tilkoblinger
 - **useRef for username i Play.jsx**: Løser stale closure-problem i useEffect med tom dependency array
-- **roomCode uppercase**: Spillere sender `roomCode.toUpperCase()` — sessions lagres med store bokstaver
-- **freeTextResponse**: Spillers tekst sendes separat fra `answerId` (fasit-IDen)
-- **Fritekst-poeng**: Settes til 0 ved innsending — host vurderer med `host:grade`
+- **Romkode som ordpar**: Genereres som `ADJEKTIV-SUBSTANTIV` (f.eks. `GLAD-HEST`) fra to ordlister — 2750+ kombinasjoner. Spillere kan skrive med mellomrom eller bindestrek, normaliseres til uppercase med bindestrek
+- **freeTextResponse**: Spillers tekst sendes separat fra `answerId` (fasit-IDen); kan sendes inn på nytt så lenge timer ikke er ute
+- **Fritekst-poeng**: Settes til 0 ved innsending — host vurderer med `host:grade` etter timer er ute
+- **gradingEnabled**: Boolean i HostLive — settes `false` ved nytt spørsmål, `true` når timer treffer 0 (eller override til 0). Forhindrer at host retter for tidlig
+- **Fritekst-deduplicering**: `freeTextAnswers` i HostLive er objekt keyet på `username` — re-innsendinger og rejoin-scenarioer overskriver alltid korrekt
+- **Nedtelling mellom spørsmål**: `session:countdown { seconds: 5 }` sendes fra server; neste spørsmål starter automatisk etter timeout — ingen "Neste spørsmål"-knapp under nedtelling
+- **Leaderboard kun på slutten**: `session:leaderboard` er fjernet; endelig leaderboard viser alle spillere med poengsum, egen plass uthevet
+- **Valgt svar-highlight**: Flervalg-knapper får `ring-4 ring-white` på valgt svar; `hover:scale-[1.03] hover:shadow-xl` på hover
+- **Bekreftelses-flash**: `confirmFlash`-state i Play.jsx — grønn pulserende melding i 2 sek ved hver fritekst-innsending
+- **Spiller rejoin ved refresh**: `sessionStorage` lagrer `{ roomCode, username }` ved join — ved refresh emitter Play.jsx automatisk `player:rejoin`. Server sender tilbake `{ status, question, timeRemaining }` beregnet fra `session.questionStartedAt`
+- **Rejoin-sikkerhet**: `player:rejoin` krever `connected === false` — kan ikke ta over plass til tilkoblet spiller. `player:join` med eksisterende frakoblet brukernavn behandles som rejoin; tilkoblet brukernavn gir "Brukernavnet er allerede tatt"
+- **questionStartedAt**: Settes på session ved spørsmålsstart, `null` under nedtelling — brukes til å beregne gjenstående tid ved rejoin
 - **speed_bonus per quiz**: Defineres i lobbyen av host, sendes med `host:start`, lagres i `session.speedBonus`
 - **Disconnect-håndtering**: Host-frakobling fryser quizen, spillere markeres `connected: false`
-- **Reconnect**: Spillere matcher på username, host matcher på romkode
 - **JSON.parse av answers**: FormData sender alt som strings — `parsedAnswers` håndterer dette i PUT og POST
 - **Socket.io autentisering**: JWT sendes via `socket.handshake.auth.token`, host-hendelser krever rolle `host`/`admin`
 - **Rate limiting**: Login og register begrenset til 10 forsøk per 15 min per IP

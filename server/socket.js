@@ -1,5 +1,29 @@
 const pool = require('./db')
 
+const adjectives = [
+    'YPPERLIG', 'FANTASTISK', 'MODIG', 'GLAD', 'STERK', 'RASK', 'LUR', 'SNILL',
+    'FLINK', 'STOR', 'ROLIG', 'IVRIG', 'FRISK', 'TRYGG', 'SUNN', 'ÆRLIG', 'KLOK',
+    'VARM', 'KALD', 'MYK', 'TUNG', 'FRI', 'NY', 'UNG', 'LANG', 'REN', 'LYS',
+    'GRØNN', 'RØD', 'GUL', 'HVIT', 'RUND', 'SKARP', 'STILLE', 'VILL', 'SØT',
+    'FIN', 'TØFF', 'KUL', 'SMART', 'KJEKK', 'BLANK', 'ELEGANT', 'HEFTIG',
+    'SAFTIG', 'GYLLEN', 'LYSTIG', 'KRAFTIG', 'FREIDIG', 'SPORTY'
+]
+
+const nouns = [
+    'DANS', 'SANG', 'FUGL', 'FISK', 'BJØRN', 'ULV', 'REV', 'ELG', 'HARE', 'SEL',
+    'KU', 'HEST', 'GRIS', 'AND', 'MUS', 'HUND', 'KATT', 'ØRN', 'LAKS', 'ROSE',
+    'SOL', 'MÅNE', 'SKY', 'VIND', 'IS', 'FJELL', 'DAL', 'SKOG', 'VANN', 'STEIN',
+    'TRE', 'BLAD', 'BLOMST', 'FRUKT', 'BÆR', 'NØTT', 'BY', 'HUS', 'VEI', 'BRO',
+    'BÅT', 'BOK', 'BORD', 'STOL', 'BALL', 'RING', 'BELTE', 'SKJOLD', 'SPYD', 'KOPP',
+    'FENGSEL', 'NESEHÅR', 'BUDDASTAUE', 'SUSHIBIT', 'KAMERALINSE'
+]
+
+function generateRoomCode() {
+    const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
+    const noun = nouns[Math.floor(Math.random() * nouns.length)]
+    return `${adj}-${noun}`
+}
+
 module.exports = function (io) {
     const sessions = {}
 
@@ -18,7 +42,7 @@ module.exports = function (io) {
                     return
                 }
 
-                const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+                const roomCode = generateRoomCode()
 
                 sessions[roomCode] = {
                     quizId,
@@ -47,6 +71,31 @@ module.exports = function (io) {
 
             if (!session) {
                 socket.emit('error', { message: 'Romkode ikke funnet' })
+                return
+            }
+
+            // Hvis brukernavnet allerede finnes og spilleren er frakoblet, behandle som rejoin
+            const existingId = Object.keys(session.players).find(
+                id => session.players[id].username === username.trim()
+            )
+            if (existingId && session.players[existingId].connected === false) {
+                const playerData = { ...session.players[existingId], connected: true }
+                delete session.players[existingId]
+                session.players[socket.id] = playerData
+                socket.join(roomCode)
+                const currentQuestion = session.questionStartedAt
+                    ? session.questions[session.currentQuestion]
+                    : null
+                const timeRemaining = currentQuestion
+                    ? Math.max(0, Math.round(currentQuestion.time_limit - (Date.now() - session.questionStartedAt) / 1000))
+                    : null
+                socket.emit('player:rejoined', { score: playerData.score, status: session.status, question: currentQuestion, timeRemaining })
+                io.to(roomCode).emit('session:players', { players: Object.values(session.players) })
+                return
+            }
+
+            if (existingId) {
+                socket.emit('error', { message: 'Brukernavnet er allerede tatt' })
                 return
             }
 
@@ -88,6 +137,7 @@ module.exports = function (io) {
             session.speedBonus = speedBonus || false
             session.status = 'active'
             session.currentQuestion = 0
+            session.questionStartedAt = Date.now()
 
             const question = session.questions[session.currentQuestion]
             io.to(roomCode).emit('session:question', { question, index: 0, total: session.questions.length })
@@ -168,10 +218,12 @@ module.exports = function (io) {
             }
 
             const countdownSeconds = 5
+            session.questionStartedAt = null
             io.to(roomCode).emit('session:countdown', { seconds: countdownSeconds })
 
             const question = session.questions[session.currentQuestion]
             setTimeout(() => {
+                session.questionStartedAt = Date.now()
                 io.to(roomCode).emit('session:question', { question, index: session.currentQuestion, total: session.questions.length })
             }, countdownSeconds * 1000)
         })
@@ -256,13 +308,31 @@ module.exports = function (io) {
                 socket.emit('error', { message: 'Fant ikke spilleren' })
                 return
             }
+            if (existing.connected !== false) {
+                socket.emit('error', { message: 'Spilleren er allerede tilkoblet' })
+                return
+            }
 
             const oldId = Object.keys(session.players).find(id => session.players[id].username === username)
-            session.players[socket.id] = { ...session.players[oldId], connected: true }
+            const playerData = { ...session.players[oldId], connected: true }
             delete session.players[oldId]
+            session.players[socket.id] = playerData
 
             socket.join(roomCode)
-            socket.emit('player:rejoined', { score: session.players[socket.id].score })
+
+            const currentQuestion = session.questionStartedAt
+                ? session.questions[session.currentQuestion]
+                : null
+            const timeRemaining = currentQuestion
+                ? Math.max(0, Math.round(currentQuestion.time_limit - (Date.now() - session.questionStartedAt) / 1000))
+                : null
+
+            socket.emit('player:rejoined', {
+                score: session.players[socket.id].score,
+                status: session.status,
+                question: currentQuestion,
+                timeRemaining
+            })
             io.to(roomCode).emit('session:players', { players: Object.values(session.players) })
         })
 

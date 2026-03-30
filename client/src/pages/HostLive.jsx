@@ -64,7 +64,12 @@ function HostLive() {
             setFinished(true)
         })
         socket.on('host:free_text_answer', (data) => {
-            setFreeTextAnswers(prev => ({ ...prev, [data.playerId]: data }))
+            setFreeTextAnswers(prev => ({ ...prev, [data.username]: data }))
+            setGradedAnswers(prev => {
+                const updated = { ...prev }
+                delete updated[data.username]
+                return updated
+            })
         })
 
         return () => {
@@ -216,22 +221,22 @@ function HostLive() {
                                 {!gradingEnabled && <p className="text-sm text-gray-400 mb-3">Kan rettes når tiden er ute</p>}
                                 <div className="flex flex-col gap-3">
                                     {Object.values(freeTextAnswers).map((a) => (
-                                        <div key={a.playerId} className="flex items-center justify-between bg-purple-50 rounded-xl px-4 py-3">
+                                        <div key={a.username} className="flex items-center justify-between bg-purple-50 rounded-xl px-4 py-3">
                                             <span className="font-semibold text-purple-900">{a.username}: <span
                                                 className="text-gray-700">{a.answer}</span></span>
                                             <div className="flex gap-2">
                                                 {!gradingEnabled ? (
                                                     <span className="text-gray-400 text-sm italic">Venter...</span>
-                                                ) : gradedAnswers[a.playerId] !== undefined ? (
-                                                    <span className={`font-bold px-3 py-1 rounded-lg ${gradedAnswers[a.playerId] ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                        {gradedAnswers[a.playerId] ? 'Riktig ✓' : 'Feil ✗'}
+                                                ) : gradedAnswers[a.username] !== undefined ? (
+                                                    <span className={`font-bold px-3 py-1 rounded-lg ${gradedAnswers[a.username] ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                        {gradedAnswers[a.username] ? 'Riktig ✓' : 'Feil ✗'}
                                                     </span>
                                                 ) : (
                                                     <>
                                                         <button
                                                             onClick={() => {
                                                                 socket.emit('host:grade', { roomCode, playerId: a.playerId, isCorrect: true })
-                                                                setGradedAnswers(prev => ({ ...prev, [a.playerId]: true }))
+                                                                setGradedAnswers(prev => ({ ...prev, [a.username]: true }))
                                                             }}
                                                             className="bg-green-500 hover:bg-green-600 text-white font-bold px-3 py-1 rounded-lg transition-colors"
                                                         >
@@ -240,7 +245,7 @@ function HostLive() {
                                                         <button
                                                             onClick={() => {
                                                                 socket.emit('host:grade', { roomCode, playerId: a.playerId, isCorrect: false })
-                                                                setGradedAnswers(prev => ({ ...prev, [a.playerId]: false }))
+                                                                setGradedAnswers(prev => ({ ...prev, [a.username]: false }))
                                                             }}
                                                             className="bg-red-500 hover:bg-red-600 text-white font-bold px-3 py-1 rounded-lg transition-colors"
                                                         >

@@ -4,6 +4,7 @@ import { mediaBase } from '../api'
 
 function Play() {
     const [answered, setAnswered] = useState(false)
+    const [confirmFlash, setConfirmFlash] = useState(false)
     const [selectedAnswerId, setSelectedAnswerId] = useState(null)
     const [finished, setFinished] = useState(false)
     const [finalLeaderboard, setFinalLeaderboard] = useState(null)
@@ -15,6 +16,7 @@ function Play() {
     const usernameRef = useRef('')
     const [joined, setJoined] = useState(false)
     const [error, setError] = useState('')
+    const isRejoinAttemptRef = useRef(false)
     const [players, setPlayers] = useState([])
     const [questionStartTime, setQuestionStartTime] = useState(null)
     const [freeTextInput, setFreeTextInput] = useState('')
@@ -38,21 +40,54 @@ function Play() {
         }, 1000)
     }
 
+    useEffect(() => {
+        const saved = sessionStorage.getItem('quizz_player')
+        if (saved) {
+            const { roomCode: savedRoom, username: savedUsername } = JSON.parse(saved)
+            setRoomCode(savedRoom)
+            setUsername(savedUsername)
+            usernameRef.current = savedUsername
+            isRejoinAttemptRef.current = true
+            socket.emit('player:rejoin', { roomCode: savedRoom, username: savedUsername })
+        }
+    }, [])
+
+    const normalizeRoomCode = (raw) =>
+        raw.trim().split(/[\s-]+/).join('-').toUpperCase()
+
     const join = (e) => {
         e.preventDefault()
-        setRoomCode(roomCode.toUpperCase())
+        const normalized = normalizeRoomCode(roomCode)
+        setRoomCode(normalized)
         usernameRef.current = username
-        socket.emit('player:join', { roomCode: roomCode.toUpperCase(), username })
+        sessionStorage.setItem('quizz_player', JSON.stringify({ roomCode: normalized, username }))
+        socket.emit('player:join', { roomCode: normalized, username })
     }
 
     useEffect(() => {
         socket.on('player:joined', () => setJoined(true))
-        socket.on('error', (data) => setError(data.message))
+        socket.on('player:rejoined', ({ status, question, timeRemaining }) => {
+            isRejoinAttemptRef.current = false
+            setJoined(true)
+            if (status === 'active' && question) {
+                setQuestion(question)
+                setQuestionStartTime(Date.now())
+                startTimer(timeRemaining)
+            }
+        })
+        socket.on('error', (data) => {
+            if (isRejoinAttemptRef.current) {
+                isRejoinAttemptRef.current = false
+                sessionStorage.removeItem('quizz_player')
+            }
+            setError(data.message)
+        })
         socket.on('session:players', ({ players }) => setPlayers(players))
         socket.on('session:question', ({ question }) => {
             setQuestion(question)
             setQuestionStartTime(Date.now())
             setAnswered(false)
+            setConfirmFlash(false)
             setSelectedAnswerId(null)
             setFreeTextInput('')
             setAudioPlaying(false)
@@ -67,6 +102,8 @@ function Play() {
         socket.on('session:timer_override', ({ seconds }) => startTimer(seconds))
         socket.on('player:answer_result', () => {
             setAnswered(true)
+            setConfirmFlash(true)
+            setTimeout(() => setConfirmFlash(false), 2000)
         })
         socket.on('session:countdown', ({ seconds }) => {
             setQuestion(null)
@@ -88,10 +125,12 @@ function Play() {
             if (countdownRef.current) clearInterval(countdownRef.current)
             setCountdownLeft(null)
             setFinished(true)
+            sessionStorage.removeItem('quizz_player')
         })
 
         return () => {
             socket.off('player:joined')
+            socket.off('player:rejoined')
             socket.off('error')
             socket.off('session:players')
             socket.off('session:question')
@@ -210,8 +249,8 @@ function Play() {
                                         })
                                     }}
                                     disabled={answered || timeLeft === 0}
-                                    className={`${answerColors[i % 4]} text-white font-bold text-xl rounded-2xl p-6 transition-colors
-  disabled:opacity-50 ${selectedAnswerId === answer.id ? 'ring-4 ring-white ring-offset-2' : ''}`}
+                                    className={`${answerColors[i % 4]} text-white font-bold text-xl rounded-2xl p-6 transition-all hover:scale-[1.03] hover:shadow-xl
+  disabled:opacity-50 disabled:hover:scale-100 ${selectedAnswerId === answer.id ? 'ring-4 ring-white ring-offset-2' : ''}`}
                                 >
                                     {answer.text}
                                 </button>
@@ -229,7 +268,8 @@ function Play() {
                                 timeUsed: Date.now() - questionStartTime
                             })
                         }} className="flex flex-col gap-4 max-w-lg mx-auto mt-8">
-                            {answered && <p className="text-green-300 font-semibold text-center">Svar registrert ✓ — du kan endre det til tiden er ute</p>}
+                            {answered && !confirmFlash && <p className="text-green-300 font-semibold text-center">Svar registrert — du kan endre det til tiden er ute</p>}
+                            {confirmFlash && <p className="text-white font-bold text-center bg-green-500 rounded-xl py-2 animate-pulse">✓ Svar registrert!</p>}
                             <input
                                 value={freeTextInput}
                                 onChange={e => setFreeTextInput(e.target.value)}
@@ -279,9 +319,8 @@ function Play() {
                     <input
                         value={roomCode}
                         onChange={e => setRoomCode(e.target.value)}
-                        placeholder="Romkode"
-                        className="border-2 border-gray-200 rounded-xl p-3 text-lg text-center uppercase tracking-widest focus:outline-none               
-  focus:border-purple-500"
+                        placeholder="f.eks. glad-hest"
+                        className="border-2 border-gray-200 rounded-xl p-3 text-lg text-center focus:outline-none focus:border-purple-500"
                     />
                     <input
                         value={username}
