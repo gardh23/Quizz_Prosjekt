@@ -15,7 +15,7 @@ function Home() {
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/quiz">
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<Home />} />

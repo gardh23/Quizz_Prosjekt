@@ -4,7 +4,8 @@
                                                             
   export default defineConfig({
     plugins: [
-      react(),                                                                                                                                              
+      react(),
       tailwindcss(),
-    ],                                                                                                                                                      
+    ],
+    base: '/quiz/',
   }) 
