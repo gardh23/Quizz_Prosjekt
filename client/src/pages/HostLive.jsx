@@ -12,19 +12,24 @@ function HostLive() {
     const [leaderboard, setLeaderboard] = useState(null)
     const [finished, setFinished] = useState(false)
     const [timer, setTimer] = useState('')
-    const [freeTextAnswers, setFreeTextAnswers] = useState([])
+    const [freeTextAnswers, setFreeTextAnswers] = useState({})
     const [gradedAnswers, setGradedAnswers] = useState({})
+    const [gradingEnabled, setGradingEnabled] = useState(false)
     const [speedBonus, setSpeedBonus] = useState(false)
     const [timeLeft, setTimeLeft] = useState(null)
+    const [countdownLeft, setCountdownLeft] = useState(null)
     const timerRef = useRef(null)
+    const countdownRef = useRef(null)
 
     const startTimer = (seconds) => {
         if (timerRef.current) clearInterval(timerRef.current)
+        setGradingEnabled(false)
         setTimeLeft(seconds)
         timerRef.current = setInterval(() => {
             setTimeLeft(prev => {
                 if (prev <= 1) {
                     clearInterval(timerRef.current)
+                    setGradingEnabled(true)
                     return 0
                 }
                 return prev - 1
@@ -37,26 +42,39 @@ function HostLive() {
         socket.on('session:question', ({ question }) => {
             setQuestion(question)
             setLeaderboard(null)
-            setFreeTextAnswers([])
+            setFreeTextAnswers({})
             setGradedAnswers({})
+            setCountdownLeft(null)
+            if (countdownRef.current) clearInterval(countdownRef.current)
             startTimer(question.time_limit)
         })
-        socket.on('session:leaderboard', ({ leaderboard }) => setLeaderboard(leaderboard))
+        socket.on('session:countdown', ({ seconds }) => {
+            setQuestion(null)
+            setCountdownLeft(seconds)
+            if (countdownRef.current) clearInterval(countdownRef.current)
+            countdownRef.current = setInterval(() => {
+                setCountdownLeft(prev => {
+                    if (prev <= 1) { clearInterval(countdownRef.current); return 0 }
+                    return prev - 1
+                })
+            }, 1000)
+        })
         socket.on('session:finished', ({ leaderboard }) => {
             setLeaderboard(leaderboard)
             setFinished(true)
         })
         socket.on('host:free_text_answer', (data) => {
-            setFreeTextAnswers(prev => [...prev, data])
+            setFreeTextAnswers(prev => ({ ...prev, [data.playerId]: data }))
         })
 
         return () => {
             socket.off('session:players')
             socket.off('session:question')
-            socket.off('session:leaderboard')
+            socket.off('session:countdown')
             socket.off('session:finished')
             socket.off('host:free_text_answer')
             if (timerRef.current) clearInterval(timerRef.current)
+            if (countdownRef.current) clearInterval(countdownRef.current)
         }
     }, [])
 
@@ -69,7 +87,13 @@ function HostLive() {
         e.preventDefault()
         const seconds = parseInt(timer)
         socket.emit('host:set_timer', { roomCode, seconds })
-        startTimer(seconds)
+        if (seconds === 0) {
+            setGradingEnabled(true)
+            if (timerRef.current) clearInterval(timerRef.current)
+            setTimeLeft(0)
+        } else {
+            startTimer(seconds)
+        }
         setTimer('')
     }
 
@@ -100,7 +124,7 @@ function HostLive() {
                     <span className="bg-purple-700 text-purple-200 px-4 py-2 rounded-xl">{players.length} spillere</span>
                 </div>
 
-                {!question && !leaderboard && (
+                {!question && !leaderboard && countdownLeft === null && (
                     <div>
                         <button
                             onClick={() => navigate('/host')}
@@ -186,16 +210,19 @@ function HostLive() {
                             </button>
                         </form>
 
-                        {question.type === 'free_text' && freeTextAnswers.length > 0 && (
+                        {question.type === 'free_text' && Object.keys(freeTextAnswers).length > 0 && (
                             <div className="bg-white rounded-2xl p-5 mb-4 shadow-lg">
-                                <h3 className="text-lg font-bold text-purple-900 mb-3">Fritekst-svar</h3>
+                                <h3 className="text-lg font-bold text-purple-900 mb-1">Fritekst-svar</h3>
+                                {!gradingEnabled && <p className="text-sm text-gray-400 mb-3">Kan rettes når tiden er ute</p>}
                                 <div className="flex flex-col gap-3">
-                                    {freeTextAnswers.map((a, i) => (
-                                        <div key={i} className="flex items-center justify-between bg-purple-50 rounded-xl px-4 py-3">
+                                    {Object.values(freeTextAnswers).map((a) => (
+                                        <div key={a.playerId} className="flex items-center justify-between bg-purple-50 rounded-xl px-4 py-3">
                                             <span className="font-semibold text-purple-900">{a.username}: <span
                                                 className="text-gray-700">{a.answer}</span></span>
                                             <div className="flex gap-2">
-                                                {gradedAnswers[a.playerId] !== undefined ? (
+                                                {!gradingEnabled ? (
+                                                    <span className="text-gray-400 text-sm italic">Venter...</span>
+                                                ) : gradedAnswers[a.playerId] !== undefined ? (
                                                     <span className={`font-bold px-3 py-1 rounded-lg ${gradedAnswers[a.playerId] ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                                         {gradedAnswers[a.playerId] ? 'Riktig ✓' : 'Feil ✗'}
                                                     </span>
@@ -237,25 +264,10 @@ function HostLive() {
                     </div>
                 )}
 
-                {leaderboard && (
-                    <div>
-                        <div className="bg-white rounded-2xl p-6 mb-4 shadow-lg">
-                            <h2 className="text-2xl font-bold text-purple-900 mb-4">Leaderboard</h2>
-                            <div className="flex flex-col gap-3">
-                                {leaderboard.map(p => (
-                                    <div key={p.username} className="flex items-center justify-between bg-purple-100 rounded-xl px-5 py-3">
-                                        <span className="font-bold text-purple-900">#{p.rank} {p.username}</span>
-                                        <span className="text-purple-600 font-bold">{p.score} poeng</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <button
-                            onClick={next}
-                            className="w-full bg-green-500 hover:bg-green-600 text-white font-bold text-xl py-4 rounded-2xl transition-colors"
-                        >
-                            Neste spørsmål
-                        </button>
+                {countdownLeft !== null && !question && (
+                    <div className="bg-white rounded-2xl p-10 text-center shadow-lg">
+                        <p className="text-gray-500 text-lg mb-2">Neste spørsmål om</p>
+                        <p className="text-8xl font-bold text-purple-700">{countdownLeft}</p>
                     </div>
                 )}
             </div>

@@ -4,8 +4,12 @@ import { mediaBase } from '../api'
 
 function Play() {
     const [answered, setAnswered] = useState(false)
-    const [result, setResult] = useState(null)
+    const [selectedAnswerId, setSelectedAnswerId] = useState(null)
     const [finished, setFinished] = useState(false)
+    const [finalLeaderboard, setFinalLeaderboard] = useState(null)
+    const [myResult, setMyResult] = useState(null)
+    const [countdownLeft, setCountdownLeft] = useState(null)
+    const countdownRef = useRef(null)
     const [roomCode, setRoomCode] = useState('')
     const [username, setUsername] = useState('')
     const usernameRef = useRef('')
@@ -49,9 +53,11 @@ function Play() {
             setQuestion(question)
             setQuestionStartTime(Date.now())
             setAnswered(false)
-            setResult(null)
+            setSelectedAnswerId(null)
             setFreeTextInput('')
             setAudioPlaying(false)
+            setCountdownLeft(null)
+            if (countdownRef.current) clearInterval(countdownRef.current)
             if (audioRef.current) {
                 audioRef.current.pause()
                 audioRef.current.currentTime = 0
@@ -62,15 +68,25 @@ function Play() {
         socket.on('player:answer_result', () => {
             setAnswered(true)
         })
-        socket.on('session:leaderboard', ({ leaderboard }) => {
-            const me = leaderboard.find(p => p.username === usernameRef.current)
-            setResult(me || null)
+        socket.on('session:countdown', ({ seconds }) => {
             setQuestion(null)
+            if (timerRef.current) clearInterval(timerRef.current)
+            setCountdownLeft(seconds)
+            if (countdownRef.current) clearInterval(countdownRef.current)
+            countdownRef.current = setInterval(() => {
+                setCountdownLeft(prev => {
+                    if (prev <= 1) { clearInterval(countdownRef.current); return 0 }
+                    return prev - 1
+                })
+            }, 1000)
         })
         socket.on('session:finished', ({ leaderboard }) => {
             const me = leaderboard.find(p => p.username === usernameRef.current)
-            setResult(me || null)
+            setMyResult(me || null)
+            setFinalLeaderboard(leaderboard)
             setQuestion(null)
+            if (countdownRef.current) clearInterval(countdownRef.current)
+            setCountdownLeft(null)
             setFinished(true)
         })
 
@@ -81,9 +97,10 @@ function Play() {
             socket.off('session:question')
             socket.off('session:timer_override')
             socket.off('player:answer_result')
-            socket.off('session:leaderboard')
+            socket.off('session:countdown')
             socket.off('session:finished')
             if (timerRef.current) clearInterval(timerRef.current)
+            if (countdownRef.current) clearInterval(countdownRef.current)
         }
     }, [])
 
@@ -94,26 +111,35 @@ function Play() {
         'bg-green-500 hover:bg-green-600',
     ]
 
-    if (joined && finished && result) {
+    if (joined && finished && finalLeaderboard) {
         return (
-            <div className="min-h-screen bg-purple-900 flex items-center justify-center">
-                <div className="bg-white rounded-2xl p-10 text-center shadow-2xl">
-                    <h1 className="text-4xl font-bold text-purple-900 mb-4">Quiz ferdig!</h1>
-                    <p className="text-2xl text-gray-700 mb-2">Poeng: <span className="font-bold text-purple-600">{result.score}</span></p>
-                    <p className="text-xl text-gray-500">Plass: {result.rank}</p>
+            <div className="min-h-screen bg-purple-900 flex items-center justify-center p-6">
+                <div className="bg-white rounded-2xl p-10 shadow-2xl w-full max-w-md">
+                    <h1 className="text-4xl font-bold text-purple-900 mb-6 text-center">Quiz ferdig!</h1>
+                    {myResult && (
+                        <div className="bg-purple-100 rounded-xl px-5 py-3 mb-6 text-center">
+                            <p className="text-lg text-purple-700 font-semibold">Din plass: #{myResult.rank} — {myResult.score} poeng</p>
+                        </div>
+                    )}
+                    <div className="flex flex-col gap-2">
+                        {finalLeaderboard.map(p => (
+                            <div key={p.username} className={`flex items-center justify-between rounded-xl px-5 py-3 ${myResult && p.username === myResult.username ? 'bg-purple-200' : 'bg-purple-50'}`}>
+                                <span className="font-bold text-purple-900">#{p.rank} {p.username}</span>
+                                <span className="text-purple-600 font-bold">{p.score} poeng</span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         )
     }
 
-    if (joined && result && !question) {
+    if (joined && countdownLeft !== null && !question && !finished) {
         return (
             <div className="min-h-screen bg-purple-900 flex items-center justify-center">
                 <div className="bg-white rounded-2xl p-10 text-center shadow-2xl">
-                    <h1 className="text-3xl font-bold text-purple-900 mb-4">Leaderboard</h1>
-                    <p className="text-2xl text-gray-700 mb-2">Poeng: <span className="font-bold text-purple-600">{result.score}</span></p>
-                    <p className="text-xl text-gray-500 mb-6">Plass: {result.rank}</p>
-                    <p className="text-gray-400 animate-pulse">Venter på neste spørsmål...</p>
+                    <p className="text-gray-500 text-lg mb-2">Neste spørsmål om</p>
+                    <p className="text-8xl font-bold text-purple-700">{countdownLeft}</p>
                 </div>
             </div>
         )
@@ -176,6 +202,7 @@ function Play() {
                                 <button
                                     key={answer.id}
                                     onClick={() => {
+                                        setSelectedAnswerId(answer.id)
                                         socket.emit('player:answer', {
                                             roomCode,
                                             answerId: answer.id,
@@ -184,7 +211,7 @@ function Play() {
                                     }}
                                     disabled={answered || timeLeft === 0}
                                     className={`${answerColors[i % 4]} text-white font-bold text-xl rounded-2xl p-6 transition-colors
-  disabled:opacity-50`}
+  disabled:opacity-50 ${selectedAnswerId === answer.id ? 'ring-4 ring-white ring-offset-2' : ''}`}
                                 >
                                     {answer.text}
                                 </button>
@@ -194,6 +221,7 @@ function Play() {
                     {question.type === 'free_text' && (
                         <form onSubmit={e => {
                             e.preventDefault()
+                            if (!freeTextInput.trim()) return
                             socket.emit('player:answer', {
                                 roomCode,
                                 answerId: question.answers[0]?.id,
@@ -201,21 +229,22 @@ function Play() {
                                 timeUsed: Date.now() - questionStartTime
                             })
                         }} className="flex flex-col gap-4 max-w-lg mx-auto mt-8">
+                            {answered && <p className="text-green-300 font-semibold text-center">Svar registrert ✓ — du kan endre det til tiden er ute</p>}
                             <input
                                 value={freeTextInput}
                                 onChange={e => setFreeTextInput(e.target.value)}
                                 placeholder="Ditt svar"
-                                disabled={answered || timeLeft === 0}
+                                disabled={timeLeft === 0}
                                 className="border-2 border-purple-300 rounded-xl p-4 text-xl focus:outline-none focus:border-purple-500
   disabled:opacity-50"
                             />
                             <button
                                 type="submit"
-                                disabled={answered || timeLeft === 0}
+                                disabled={timeLeft === 0}
                                 className="bg-green-500 hover:bg-green-600 text-white font-bold text-xl py-4 rounded-xl transition-colors
   disabled:opacity-50"
                             >
-                                Send svar
+                                {answered ? 'Oppdater svar' : 'Send svar'}
                             </button>
                         </form>
                     )}

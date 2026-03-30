@@ -108,7 +108,7 @@ module.exports = function (io) {
             }
 
             const question = session.questions[session.currentQuestion]
-            if (player.answers[question.id]) {
+            if (player.answers[question.id] && question.type !== 'free_text') {
                 socket.emit('error', { message: 'Du har allerede svart' })
                 return
             }
@@ -155,25 +155,25 @@ module.exports = function (io) {
                 return
             }
 
-            const leaderboard = Object.values(session.players)
-                .sort((a, b) => b.score - a.score)
-                .map((p, i) => ({ username: p.username, score: p.score, rank: i + 1 }))
-
-            io.to(roomCode).emit('session:leaderboard', { leaderboard })
-
             session.currentQuestion++
 
             if (session.currentQuestion >= session.questions.length) {
+                const leaderboard = Object.values(session.players)
+                    .sort((a, b) => b.score - a.score)
+                    .map((p, i) => ({ username: p.username, score: p.score, rank: i + 1 }))
                 session.status = 'finished'
                 io.to(roomCode).emit('session:finished', { leaderboard })
                 delete sessions[roomCode]
                 return
             }
 
+            const countdownSeconds = 5
+            io.to(roomCode).emit('session:countdown', { seconds: countdownSeconds })
+
             const question = session.questions[session.currentQuestion]
             setTimeout(() => {
                 io.to(roomCode).emit('session:question', { question, index: session.currentQuestion, total: session.questions.length })
-            }, 5000)
+            }, countdownSeconds * 1000)
         })
 
         socket.on('host:set_timer', ({ roomCode, seconds }) => {
