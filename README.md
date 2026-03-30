@@ -105,9 +105,10 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 ### Host sender:
 - `host:create` → oppretter spilløkt med romkode
 - `host:start` → starter quiz med `speedBonus`-valg fra lobbyen
-- `host:next` → starter nedtelling og sender neste spørsmål automatisk (eller avslutter med leaderboard)
+- `host:next` → starter nedtelling og sender neste spørsmål automatisk; etter siste spørsmål starter rettefasen
 - `host:set_timer` → overstyrer timer live
-- `host:grade` → vurderer fritekst-svar (isCorrect: true/false) — kun etter at timer er ute
+- `host:grade` → vurderer fritekst-svar (isCorrect: true/false) — kun i rettefasen
+- `host:grading_next` → går til neste spørsmål i rettefasen, eller avslutter med leaderboard
 - `host:rejoin` → gjenkobler etter frakobling
 
 ### Spiller sender:
@@ -124,6 +125,8 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 - `session:countdown` → nedtelling mellom spørsmål `{ seconds: 5 }`
 - `player:answer_result` → bekreftelse på svar (til spiller); vises som flash-melding
 - `host:free_text_answer` → fritekst-svar videresendt til host (oppdaterer eksisterende ved re-innsending)
+- `session:grading_question` → starter/oppdaterer rettefasen med `{ question, playerAnswers, gradingIndex, total }` — sendes til hele rommet
+- `session:answer_graded` → kringkastes til hele rommet når host retter et svar `{ username, isCorrect, points }`
 - `session:finished` → quiz ferdig med endelig leaderboard (alle spillere + poeng)
 - `session:frozen` → host koblet fra, quiz fryst
 - `session:resumed` → host koblet til igjen
@@ -136,8 +139,9 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 - **useRef for username i Play.jsx**: Løser stale closure-problem i useEffect med tom dependency array
 - **Romkode som ordpar**: Genereres som `ADJEKTIV-SUBSTANTIV` (f.eks. `GLAD-HEST`) fra to ordlister — 2750+ kombinasjoner. Spillere kan skrive med mellomrom eller bindestrek, normaliseres til uppercase med bindestrek
 - **freeTextResponse**: Spillers tekst sendes separat fra `answerId` (fasit-IDen); kan sendes inn på nytt så lenge timer ikke er ute
-- **Fritekst-poeng**: Settes til 0 ved innsending — host vurderer med `host:grade` etter timer er ute
-- **gradingEnabled**: Boolean i HostLive — settes `false` ved nytt spørsmål, `true` når timer treffer 0 (eller override til 0). Forhindrer at host retter for tidlig
+- **Fritekst-poeng**: Settes til 0 ved innsending — host vurderer med `host:grade` i rettefasen
+- **Rettefase**: Etter siste spørsmål går quizen inn i `status: 'grading'`. Host blar gjennom alle spørsmål med `host:grading_next`. Flervalg rettes automatisk, fritekst manuelt. Alle spillere ser alle svar og rettingen live via `session:grading_question` og `session:answer_graded`. Leaderboard vises kun etter rettefasen.
+- **buildPlayerAnswers**: Hjelpefunksjon på server — bygger array av `{ username, socketId, answered, answerText/freeTextResponse, isCorrect, points, graded }` for alle spillere per spørsmål
 - **Fritekst-deduplicering**: `freeTextAnswers` i HostLive er objekt keyet på `username` — re-innsendinger og rejoin-scenarioer overskriver alltid korrekt
 - **Nedtelling mellom spørsmål**: `session:countdown { seconds: 5 }` sendes fra server; neste spørsmål starter automatisk etter timeout — ingen "Neste spørsmål"-knapp under nedtelling
 - **Leaderboard kun på slutten**: `session:leaderboard` er fjernet; endelig leaderboard viser alle spillere med poengsum, egen plass uthevet
@@ -160,6 +164,7 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 - **Timer**: `startTimer(seconds)` bruker `setInterval` + `useRef` — nullstilles ved nytt spørsmål, rød ved ≤ 10 sek, blokkerer svar ved 0
 - **Custom audio-spiller**: Native `<audio>` uten `controls`, styrt via `useRef` — kun play/pause og volum eksponert for spiller
 - **mediaBase**: Eksportert fra `api.js` — `''` i produksjon, `'http://localhost:3000'` lokalt — brukes for alle bilde/lyd-URLer
+- **Audio key i rettefase**: `<audio key={gradingQuestion.id}>` tvinger React til å opprette nytt element ved spørsmålsbytte, slik at nettleseren faktisk laster ny lydfil
 - **Login redirect**: Bruker `navigate('/')` fra React Router (ikke `window.location.href`) for å respektere `basename="/quiz"`
 
 ---

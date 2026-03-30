@@ -26,6 +26,12 @@ function Play() {
     const [timeLeft, setTimeLeft] = useState(null)
     const timerRef = useRef(null)
 
+    // Rettefase
+    const [gradingQuestion, setGradingQuestion] = useState(null)
+    const [gradingPlayerAnswers, setGradingPlayerAnswers] = useState([])
+    const [gradingIndex, setGradingIndex] = useState(0)
+    const [gradingTotal, setGradingTotal] = useState(0)
+
     const startTimer = (seconds) => {
         if (timerRef.current) clearInterval(timerRef.current)
         setTimeLeft(seconds)
@@ -117,11 +123,26 @@ function Play() {
                 })
             }, 1000)
         })
+        socket.on('session:grading_question', ({ question, playerAnswers, gradingIndex, total }) => {
+            setGradingQuestion(question)
+            setGradingPlayerAnswers(playerAnswers)
+            setGradingIndex(gradingIndex)
+            setGradingTotal(total)
+            setQuestion(null)
+            setCountdownLeft(null)
+            if (countdownRef.current) clearInterval(countdownRef.current)
+        })
+        socket.on('session:answer_graded', ({ username, isCorrect, points }) => {
+            setGradingPlayerAnswers(prev => prev.map(a =>
+                a.username === username ? { ...a, isCorrect, points, graded: true } : a
+            ))
+        })
         socket.on('session:finished', ({ leaderboard }) => {
             const me = leaderboard.find(p => p.username === usernameRef.current)
             setMyResult(me || null)
             setFinalLeaderboard(leaderboard)
             setQuestion(null)
+            setGradingQuestion(null)
             if (countdownRef.current) clearInterval(countdownRef.current)
             setCountdownLeft(null)
             setFinished(true)
@@ -137,6 +158,8 @@ function Play() {
             socket.off('session:timer_override')
             socket.off('player:answer_result')
             socket.off('session:countdown')
+            socket.off('session:grading_question')
+            socket.off('session:answer_graded')
             socket.off('session:finished')
             if (timerRef.current) clearInterval(timerRef.current)
             if (countdownRef.current) clearInterval(countdownRef.current)
@@ -179,6 +202,62 @@ function Play() {
                 <div className="bg-white rounded-2xl p-10 text-center shadow-2xl">
                     <p className="text-gray-500 text-lg mb-2">Neste spørsmål om</p>
                     <p className="text-8xl font-bold text-purple-700">{countdownLeft}</p>
+                </div>
+            </div>
+        )
+    }
+
+    if (joined && gradingQuestion) {
+        const correctAnswers = gradingQuestion.answers?.filter(a => a.is_correct) || []
+        return (
+            <div className="min-h-screen bg-purple-900 p-6">
+                <div className="max-w-2xl mx-auto">
+                    <h1 className="text-2xl font-bold text-white mb-4">
+                        Rettefase — <span className="text-yellow-300">{gradingIndex + 1} / {gradingTotal}</span>
+                    </h1>
+                    <div className="bg-white rounded-2xl p-6 shadow-lg">
+                        <h2 className="text-xl font-bold text-purple-900 mb-2">{gradingQuestion.text}</h2>
+                        {gradingQuestion.type === 'multiple_choice' && (
+                            <div className="flex flex-wrap gap-2 mb-3">
+                                {correctAnswers.map(a => (
+                                    <span key={a.id} className="bg-green-100 text-green-700 font-semibold px-3 py-1 rounded-lg text-sm">
+                                        Fasit: {a.text}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                        {gradingQuestion.image_path && (
+                            <img
+                                src={`${mediaBase}/${gradingQuestion.image_path}`}
+                                style={{ width: `${gradingQuestion.image_width || 100}%` }}
+                                className="mx-auto rounded-xl object-contain mb-3"
+                            />
+                        )}
+                        {gradingQuestion.audio_path && (
+                            <audio key={gradingQuestion.id} controls src={`${mediaBase}/${gradingQuestion.audio_path}`} className="w-full mb-3" />
+                        )}
+                        <div className="flex flex-col gap-2 mt-3">
+                            {gradingPlayerAnswers.map(a => (
+                                <div key={a.username} className={`flex items-center justify-between rounded-xl px-4 py-3 ${a.username === usernameRef.current ? 'bg-purple-100' : 'bg-purple-50'}`}>
+                                    <div>
+                                        <span className="font-semibold text-purple-900">{a.username}</span>
+                                        {!a.answered ? (
+                                            <span className="text-gray-400 text-sm ml-2">Ikke svart</span>
+                                        ) : gradingQuestion.type === 'multiple_choice' ? (
+                                            <span className="text-gray-700 text-sm ml-2">{a.answerText}</span>
+                                        ) : (
+                                            <span className="text-gray-700 text-sm ml-2">"{a.freeTextResponse}"</span>
+                                        )}
+                                    </div>
+                                    {a.answered && (gradingQuestion.type === 'multiple_choice' || a.graded) && (
+                                        <span className={`font-bold px-3 py-1 rounded-lg text-sm ${a.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                            {a.isCorrect ? `✓ ${a.points}p` : '✗'}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
         )

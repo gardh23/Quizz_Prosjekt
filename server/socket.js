@@ -18,6 +18,19 @@ const nouns = [
     'FENGSEL', 'NESEHÅR', 'BUDDASTAUE', 'SUSHIBIT', 'KAMERALINSE'
 ]
 
+function buildPlayerAnswers(session, question) {
+    return Object.entries(session.players).map(([socketId, player]) => {
+        const ans = player.answers[question.id]
+        if (!ans) return { username: player.username, socketId, answered: false }
+        if (question.type === 'multiple_choice') {
+            const answerObj = (question.answers || []).find(a => a.id === ans.answerId)
+            return { username: player.username, socketId, answered: true, answerText: answerObj ? answerObj.text : '?', isCorrect: ans.isCorrect, points: ans.points }
+        } else {
+            return { username: player.username, socketId, answered: !!ans.freeTextResponse, freeTextResponse: ans.freeTextResponse || '', isCorrect: ans.isCorrect, points: ans.points, graded: !!ans.graded }
+        }
+    })
+}
+
 function generateRoomCode() {
     const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
     const noun = nouns[Math.floor(Math.random() * nouns.length)]
@@ -165,6 +178,9 @@ module.exports = function (io) {
 
             const answer = question.answers.find(a => a.id === answerId)
             const isCorrect = question.type === 'free_text' ? false : (answer?.is_correct || false)
+            const safeResponse = question.type === 'free_text' && typeof freeTextResponse === 'string'
+                ? freeTextResponse.slice(0, 100)
+                : ''
 
             let points = 0
             if (isCorrect) {
@@ -173,15 +189,12 @@ module.exports = function (io) {
                     : 500
             }
 
-            player.answers[question.id] = { answerId, isCorrect, points, timeUsed }
+            player.answers[question.id] = { answerId, isCorrect, points, timeUsed, freeTextResponse: safeResponse, graded: false }
             player.score += points
             socket.emit('player:answer_result', { isCorrect, points })
             if (question.type === 'free_text') {
                 const hostSocket = io.sockets.sockets.get(session.host)
                 if (hostSocket) {
-                    const safeResponse = typeof freeTextResponse === 'string'
-                        ? freeTextResponse.slice(0, 100)
-                        : ''
                     hostSocket.emit('host:free_text_answer', {
                         playerId: socket.id,
                         username: player.username,
@@ -208,12 +221,15 @@ module.exports = function (io) {
             session.currentQuestion++
 
             if (session.currentQuestion >= session.questions.length) {
-                const leaderboard = Object.values(session.players)
-                    .sort((a, b) => b.score - a.score)
-                    .map((p, i) => ({ username: p.username, score: p.score, rank: i + 1 }))
-                session.status = 'finished'
-                io.to(roomCode).emit('session:finished', { leaderboard })
-                delete sessions[roomCode]
+                session.status = 'grading'
+                session.gradingIndex = 0
+                const firstQuestion = session.questions[0]
+                io.to(roomCode).emit('session:grading_question', {
+                    question: firstQuestion,
+                    playerAnswers: buildPlayerAnswers(session, firstQuestion),
+                    gradingIndex: 0,
+                    total: session.questions.length
+                })
                 return
             }
 
@@ -226,6 +242,38 @@ module.exports = function (io) {
                 session.questionStartedAt = Date.now()
                 io.to(roomCode).emit('session:question', { question, index: session.currentQuestion, total: session.questions.length })
             }, countdownSeconds * 1000)
+        })
+
+        socket.on('host:grading_next', ({ roomCode }) => {
+            if (!socket.user || (socket.user.role !== 'host' && socket.user.role !== 'admin')) {
+                socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
+            const session = sessions[roomCode]
+            if (!session || session.host !== socket.id) {
+                socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
+
+            session.gradingIndex++
+
+            if (session.gradingIndex >= session.questions.length) {
+                const leaderboard = Object.values(session.players)
+                    .sort((a, b) => b.score - a.score)
+                    .map((p, i) => ({ username: p.username, score: p.score, rank: i + 1 }))
+                session.status = 'finished'
+                io.to(roomCode).emit('session:finished', { leaderboard })
+                delete sessions[roomCode]
+                return
+            }
+
+            const question = session.questions[session.gradingIndex]
+            io.to(roomCode).emit('session:grading_question', {
+                question,
+                playerAnswers: buildPlayerAnswers(session, question),
+                gradingIndex: session.gradingIndex,
+                total: session.questions.length
+            })
         })
 
         socket.on('host:set_timer', ({ roomCode, seconds }) => {
@@ -258,7 +306,8 @@ module.exports = function (io) {
             const player = session.players[playerId]
             if (!player) return
 
-            const question = session.questions[session.currentQuestion]
+            const questionIndex = session.status === 'grading' ? session.gradingIndex : session.currentQuestion
+            const question = session.questions[questionIndex]
             const points = isCorrect
                 ? session.speedBonus
                     ? Math.round(1000 * (1 - player.answers[question.id].timeUsed / (question.time_limit * 1000)))
@@ -266,14 +315,11 @@ module.exports = function (io) {
                 : 0
 
             player.answers[question.id].isCorrect = isCorrect
+            player.answers[question.id].graded = true
             player.answers[question.id].points = points
             player.score += points
 
-            const playerSocket = io.sockets.sockets.get(playerId)
-            if (playerSocket) {
-                playerSocket.emit('player:answer_result', { isCorrect, points })
-            }
-
+            io.to(roomCode).emit('session:answer_graded', { username: player.username, isCorrect, points })
             io.to(roomCode).emit('session:players', { players: Object.values(session.players) })
         })
 
