@@ -6,15 +6,6 @@ Kahoot-inspirert quiz-applikasjon med støtte for flervalg og fritekst-svar.
 
 ---
 
-## Til Claude: Kontekst og regler
-
-- **Brukeren skriver mesteparten av koden selv** — din rolle er å forklare, veilede og vise retning, ikke å skrive alt ferdig
-- **Aldri push til GitHub direkte** — brukeren gjør alle commits og pushes selv
-- **Du kan oppdatere denne README-filen** for å holde oversikt over fremdrift og nye instrukser
-- Brukeren lærer mens han bygger — **forklar alltid hva og hvorfor i detalj**, ikke bare hvordan. Ikke anta at brukeren vet hva noe er eller gjør — forklar konseptet, hvorfor vi gjør det, og hva som skjer under panseret. **Forklar underveis mens vi bygger, ikke alt på forhånd.**
-- **Ikke rediger kode direkte** med mindre brukeren eksplisitt sier "du kan gjøre denne endringen for meg" eller "gjør det du" — vis hva som skal endres og la brukeren gjøre det selv
-- **Hvis brukeren gir nye instrukser eller preferanser underveis, oppdater alltid denne README-filen slik at neste Claude-sesjon forstår dem**
-- **I deploy-fasen gjør brukeren ALT selv** — Claude forklarer hva som skal gjøres og hvorfor, men skriver ingen kommandoer direkte inn i terminalen for brukeren. Forklar sikkerhetsbegrunnelsen bak hvert steg.
 
 ---
 
