@@ -186,7 +186,7 @@ module.exports = function (io) {
             if (isCorrect) {
                 points = session.speedBonus
                     ? Math.round(1000 * (1 - timeUsed / (question.time_limit * 1000)))
-                    : 500
+                    : 1
             }
 
             player.answers[question.id] = { answerId, isCorrect, points, timeUsed, freeTextResponse: safeResponse, graded: false }
@@ -311,7 +311,7 @@ module.exports = function (io) {
             const points = isCorrect
                 ? session.speedBonus
                     ? Math.round(1000 * (1 - player.answers[question.id].timeUsed / (question.time_limit * 1000)))
-                    : 500
+                    : 1
                 : 0
 
             player.answers[question.id].isCorrect = isCorrect
