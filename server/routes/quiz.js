@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const pool = require('../db')
+const fs = require('fs')
 const { requireAuth, requireRole } = require('../middleware/auth')
 const upload = require('../middleware/upload')
 
@@ -101,7 +102,14 @@ router.delete('/:id', requireAuth, requireRole('host', 'admin'), async (req, res
             return res.status(403).json({ error: 'Du kan bare slette dine egne quizer' })
         }
 
+        const questionsResult = await pool.query('SELECT image_path, audio_path FROM questions WHERE quiz_id = $1', [id])
         await pool.query('DELETE FROM quizzes WHERE id = $1', [id])
+
+        for (const q of questionsResult.rows) {
+            if (q.image_path) fs.unlink(q.image_path, () => {})
+            if (q.audio_path) fs.unlink(q.audio_path, () => {})
+        }
+
         res.json({ message: 'Quiz slettet' })
     } catch (err) {
         console.error(err)
@@ -150,10 +158,17 @@ router.put('/:quizId/questions/:questionId', requireAuth, requireRole('host', 'a
     const audio_path = req.files?.audio ? req.files.audio[0].path : null
 
     try {
+        const old = await pool.query('SELECT image_path, audio_path FROM questions WHERE id = $1', [questionId])
+        const oldImage = old.rows[0]?.image_path
+        const oldAudio = old.rows[0]?.audio_path
+
         const result = await pool.query(
             'UPDATE questions SET type=$1, text=$2, time_limit=$3, order_index=$4, image_path=COALESCE($5, image_path), audio_path=COALESCE($6, audio_path), image_width=$7 WHERE id=$8 RETURNING *',
             [type, text, time_limit, order_index, image_path, audio_path, image_width || 100, questionId]
         )
+
+        if (image_path && oldImage) fs.unlink(oldImage, () => {})
+        if (audio_path && oldAudio) fs.unlink(oldAudio, () => {})
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Spørsmål ikke funnet' })
         }
@@ -179,10 +194,15 @@ router.delete('/:quizId/questions/:questionId', requireAuth, requireRole('host',
     const { questionId } = req.params
 
     try {
-        const result = await pool.query('DELETE FROM questions WHERE id = $1 RETURNING id', [questionId])
+        const result = await pool.query('DELETE FROM questions WHERE id = $1 RETURNING *', [questionId])
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Spørsmål ikke funnet' })
         }
+
+        const { image_path, audio_path } = result.rows[0]
+        if (image_path) fs.unlink(image_path, () => {})
+        if (audio_path) fs.unlink(audio_path, () => {})
+
         res.json({ message: 'Spørsmål slettet' })
     } catch (err) {
         console.error(err)

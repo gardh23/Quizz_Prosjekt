@@ -143,7 +143,7 @@ function HostLive() {
 
                     <div className="bg-white rounded-2xl p-6 mb-4 shadow-lg">
                         <h2 className="text-xl font-bold text-purple-900 mb-2">{gradingQuestion.text}</h2>
-                        {gradingQuestion.type === 'multiple_choice' && (
+                        {correctAnswers.length > 0 && (
                             <div className="flex flex-wrap gap-2 mb-3">
                                 {correctAnswers.map(a => (
                                     <span key={a.id} className="bg-green-100 text-green-700 font-semibold px-3 py-1 rounded-lg text-sm">
@@ -296,6 +296,11 @@ function HostLive() {
                         {question.type === 'free_text' && Object.keys(freeTextAnswers).length > 0 && (
                             <div className="bg-white rounded-2xl p-5 mb-4 shadow-lg">
                                 <h3 className="text-lg font-bold text-purple-900 mb-1">Fritekst-svar</h3>
+                                {question.answers?.filter(a => a.is_correct).map(a => (
+                                    <span key={a.id} className="inline-block bg-green-100 text-green-700 font-semibold px-3 py-1 rounded-lg text-sm mb-3">
+                                        Fasit: {a.text}
+                                    </span>
+                                ))}
                                 <p className="text-sm text-gray-400 mb-3">Rettes i rettefasen</p>
                                 <div className="flex flex-col gap-2">
                                     {Object.values(freeTextAnswers).map(a => (

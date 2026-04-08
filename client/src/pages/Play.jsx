@@ -217,7 +217,7 @@ function Play() {
                     </h1>
                     <div className="bg-white rounded-2xl p-6 shadow-lg">
                         <h2 className="text-xl font-bold text-purple-900 mb-2">{gradingQuestion.text}</h2>
-                        {gradingQuestion.type === 'multiple_choice' && (
+                        {correctAnswers.length > 0 && (
                             <div className="flex flex-wrap gap-2 mb-3">
                                 {correctAnswers.map(a => (
                                     <span key={a.id} className="bg-green-100 text-green-700 font-semibold px-3 py-1 rounded-lg text-sm">
