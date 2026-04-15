@@ -145,7 +145,7 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 - **Disconnect-håndtering**: Host-frakobling fryser quizen, spillere markeres `connected: false`
 - **JSON.parse av answers**: FormData sender alt som strings — `parsedAnswers` håndterer dette i PUT og POST
 - **Socket.io autentisering**: JWT sendes via `socket.handshake.auth.token`, host-hendelser krever rolle `host`/`admin`
-- **Rate limiting**: Login og register begrenset til 10 forsøk per 15 min per IP
+- **Rate limiting**: Login og register er rate-limited per IP
 - **Input-validering socket**: `username` maks 30 tegn, `freeTextResponse` maks 100 tegn
 - **Quiz-eierskap**: Host kan bare slette/redigere egne quizer — admin kan gjøre det for alle
 - **Filopplasting**: Både MIME-type og filendelse valideres, `audio/mp3` hvitelistet i tillegg til `audio/mpeg`
@@ -163,8 +163,7 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 ## Produksjonsoppsett (DigitalOcean)
 
 ### Server
-- **Droplet**: Ubuntu, IP `104.248.81.228`, domene `gardh23.eu`
-- **Bruker**: `gard` (sudo, ikke root)
+- **Droplet**: Ubuntu,domene `gardh23.eu`
 - **Brannmur**: `ufw` — kun port 22, 80, 443 åpne
 - **Node.js**: v22 (installert via NodeSource)
 - **PostgreSQL**: Lokal installasjon, kun tilgjengelig internt
@@ -174,7 +173,7 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 
 ### Prosjektplassering
 ```
-/home/gard/Quizz_Prosjekt/
+~/Quizz_Prosjekt/
 ├── client/dist/          # Bygget React-app (genereres med npm run build)
 └── server/
     ├── .env              # Hemmeligheter (chmod 600, ikke i git)
@@ -184,18 +183,18 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 ### NGINX-konfig (`/etc/nginx/sites-available/gardh23.eu`)
 ```nginx
 location /quiz/ {
-    alias /home/gard/Quizz_Prosjekt/client/dist/;
+    alias ~/Quizz_Prosjekt/client/dist/;
     try_files $uri $uri/ /quiz/index.html;
 }
 location /socket.io/ {
-    proxy_pass http://localhost:3000;
+    proxy_pass http://localhost:<port>;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
     proxy_set_header Host $host;
 }
-location ~ ^/(auth|quizzes|admin|uploads) {
-    proxy_pass http://localhost:3000;
+location ~ ^/(api-ruter) {
+    proxy_pass http://localhost:<port>;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
 }
@@ -203,8 +202,8 @@ client_max_body_size 10M;
 ```
 
 ### Database
-- **Navn**: `quizz_db`
-- **Bruker**: `quizz_user` — kun rettigheter til `quizz_db` (ikke superuser)
+- **Navn**: Konfigurert via `.env`
+- **Bruker**: Dedikert DB-bruker — kun rettigheter til applikasjonens database (ikke superuser)
 - Opprettet admin-bruker direkte i DB med bcrypt-hash
 
 ### Deploy-prosedyre ved oppdatering
@@ -223,9 +222,9 @@ cd ~/Quizz_Prosjekt/server && pm2 restart quizz
 ```
 
 ### Sikkerhetsprinsipper
-- Minste privilegium: `quizz_user` har kun tilgang til `quizz_db`
+- Minste privilegium: dedikert DB-bruker har kun tilgang til applikasjonens database
 - Ingen hemmeligheter i git — `.env` er i `.gitignore` og har `chmod 600`
-- Express (port 3000) er ikke eksponert mot internett — kun NGINX snakker med den
+- Express er ikke eksponert mot internett — kun NGINX snakker med den
 - HTTPS tvunget — HTTP redirecter til HTTPS via Certbot
 - Brannmur blokkerer alle porter unntatt 22, 80, 443
 
