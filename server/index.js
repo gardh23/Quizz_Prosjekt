@@ -53,6 +53,6 @@ io.use((socket, next) => {
 
 require('./socket')(io)
 
-server.listen(PORT, () => {
+server.listen(PORT, '127.0.0.1', () => {
   console.log(`Server kjører på http://localhost:${PORT}`)
 })
