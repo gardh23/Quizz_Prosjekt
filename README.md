@@ -141,6 +141,9 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 - **Svarfordeling**: `session:grading_question` har `distribution` (antall per alternativ + `isCorrect`) for flervalg og sant/usant, ellers `null`. Vises som stolper i svarknappenes farger (`components/AnswerDistribution.jsx`)
 - **Leaderboard ved uavgjort**: lik poengsum gir delt plass, neste plass hoppes over (1, 1, 3)
 - **Pall**: `components/Podium.jsx` avslører 3. → 2. → 1. plass, med konfetti (`canvas-confetti`) og fanfare. Respekterer `prefers-reduced-motion`
+- **Designsystem**: knapperoller og feltstil defineres én gang i `src/index.css` (`.btn` + `.btn-go`/`.btn-next`/`.btn-soft`/`.btn-ghost`/`.btn-danger`/`.btn-danger-soft`/`.btn-lg`, `.field`). Bruk dem i stedet for egne fargeklasser. Inngangsanimasjoner (`animate-pop`, `animate-rise`) ligger i `@theme` og brukes alltid med `motion-safe:`
+- **Delte komponenter**: `TopBar` (tilbake + brukermerke i flyt, ikke `fixed`), `Timer` (sekunder + tidslinje), `AnswerLetter` (A–D på svarknapper og i svarfordelingen), `ResultBadge` (✓ kun når helt riktig, oransje delpoeng, rødt ✗), `YouBadge`, `FilePicker`
+- **Invitasjon**: «Kopier invitasjon» i lobbyen lager en lenke `…/quiz/play?rom=KODE` som fyller ut romkoden
 - **Lyd**: `src/sound.js` syntetiserer alt med Web Audio (ingen lydfiler). Toner hoppes over til nettleseren har låst opp lyd (første klikk). Mute-valget lagres i `localStorage` (`quizz_muted`)
 - **freeTextResponse**: Spillers tekst sendes separat fra `answerId` (fasit-IDen); kan sendes inn på nytt så lenge timer ikke er ute
 - **Fritekst-poeng**: Settes til 0 ved innsending — host vurderer med `host:grade` i rettefasen
@@ -274,4 +277,4 @@ Testene i `server/test/` starter en ekte Socket.io-server med en falsk database 
 
 ## Neste steg
 
-Prosjektet er i produksjon på https://gardh23.eu/quiz/. Forbedringsrunde 2: fase 1 (sikkerhet og bugs), fase 2 (sant/usant, tallestimat, rangering) og fase 3 (svarfordeling i rettefasen, pall med konfetti, lyd) er gjort; neste er designoppussing.
+Prosjektet er i produksjon på https://gardh23.eu/quiz/. Forbedringsrunde 2: fase 1 (sikkerhet og bugs), fase 2 (sant/usant, tallestimat, rangering) fase 3 (svarfordeling i rettefasen, pall med konfetti, lyd) og fase 4 (designoppussing) er gjort.
