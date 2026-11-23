@@ -10,6 +10,11 @@ const emptyAnswers = [
     { text: '', is_correct: false }
 ]
 
+const defaultAnswers = (type) => {
+    if (type === 'true_false') return [{ text: 'Sant', is_correct: true }, { text: 'Usant', is_correct: false }]
+    return emptyAnswers
+}
+
 function QuizEditor() {
     const { id } = useParams()
     const navigate = useNavigate()
@@ -171,12 +176,13 @@ function QuizEditor() {
                             value={type}
                             onChange={e => {
                                 setType(e.target.value)
-                                setAnswers(emptyAnswers)
+                                setAnswers(defaultAnswers(e.target.value))
                             }}
                             className="border-2 border-gray-200 rounded-xl p-3 text-lg focus:outline-none focus:border-purple-500"
                         >
                             <option value="multiple_choice">Flervalg</option>
                             <option value="free_text">Fritekst</option>
+                            <option value="true_false">Sant/usant</option>
                         </select>
 
                         <input
@@ -267,6 +273,24 @@ function QuizEditor() {
                                 </label>
                             </div>
                         ))}
+
+                        {type === 'true_false' && (
+                            <div className="flex items-center gap-6">
+                                <span className="text-gray-600 font-semibold">Fasit:</span>
+                                {answers.map((answer, i) => (
+                                    <label key={answer.text} className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="true_false"
+                                            checked={answer.is_correct}
+                                            onChange={() => setAnswers(answers.map((a, j) => ({ ...a, is_correct: j === i })))}
+                                            className="w-5 h-5 accent-purple-600"
+                                        />
+                                        <span className="text-gray-700 text-lg">{answer.text}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
 
                         {type === 'free_text' && (
                             <input

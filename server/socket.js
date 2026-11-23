@@ -18,11 +18,16 @@ const nouns = [
     'FENGSEL', 'NESEHÅR', 'BUDDASTAUE', 'SUSHIBIT', 'KAMERALINSE'
 ]
 
+// Pick-one-option questions share answering and grading logic.
+function isChoice(type) {
+    return type === 'multiple_choice' || type === 'true_false'
+}
+
 function buildPlayerAnswers(session, question) {
     return Object.entries(session.players).map(([socketId, player]) => {
         const ans = player.answers[question.id]
         if (!ans) return { username: player.username, socketId, answered: false }
-        if (question.type === 'multiple_choice') {
+        if (isChoice(question.type)) {
             const answerObj = (question.answers || []).find(a => a.id === ans.answerId)
             return { username: player.username, socketId, answered: true, answerText: answerObj ? answerObj.text : '?', isCorrect: ans.isCorrect, points: ans.points }
         } else {

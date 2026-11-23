@@ -263,13 +263,13 @@ function Play() {
                                         <span className="font-semibold text-purple-900">{a.username}</span>
                                         {!a.answered ? (
                                             <span className="text-gray-400 text-sm ml-2">Ikke svart</span>
-                                        ) : gradingQuestion.type === 'multiple_choice' ? (
+                                        ) : gradingQuestion.type !== 'free_text' ? (
                                             <span className="text-gray-700 text-sm ml-2">{a.answerText}</span>
                                         ) : (
                                             <span className="text-gray-700 text-sm ml-2">"{a.freeTextResponse}"</span>
                                         )}
                                     </div>
-                                    {a.answered && (gradingQuestion.type === 'multiple_choice' || a.graded) && (
+                                    {a.answered && (gradingQuestion.type !== 'free_text' || a.graded) && (
                                         <span className={`font-bold px-3 py-1 rounded-lg text-sm ${a.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                             {a.isCorrect ? `✓ ${a.points}p` : '✗'}
                                         </span>
@@ -334,7 +334,7 @@ function Play() {
                     </div>
                 </div>
                 <div className="flex-1 p-6">
-                    {question.type === 'multiple_choice' && (
+                    {(question.type === 'multiple_choice' || question.type === 'true_false') && (
                         <div className="grid grid-cols-2 gap-4 h-full">
                             {question.answers.map((answer, i) => (
                                 <button

@@ -20,11 +20,11 @@ const questions = [
     }
 ]
 
-function fakeDb() {
+function fakeDb(quizQuestions = questions) {
     return {
         query: async (sql) => {
             if (sql.includes('FROM quizzes')) return { rows: [{ id: 1 }] }
-            if (sql.includes('FROM questions')) return { rows: structuredClone(questions) }
+            if (sql.includes('FROM questions')) return { rows: structuredClone(quizQuestions) }
             throw new Error(`unexpected query: ${sql}`)
         }
     }

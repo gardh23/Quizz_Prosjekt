@@ -198,7 +198,7 @@ function HostLive() {
                                             <span className="font-semibold text-purple-900">{a.username}</span>
                                             {!a.answered ? (
                                                 <span className="text-gray-400 text-sm ml-2">Ikke svart</span>
-                                            ) : gradingQuestion.type === 'multiple_choice' ? (
+                                            ) : gradingQuestion.type !== 'free_text' ? (
                                                 <span className="text-gray-700 text-sm ml-2">{a.answerText}</span>
                                             ) : (
                                                 <span className="text-gray-700 text-sm ml-2">"{a.freeTextResponse}"</span>
@@ -206,7 +206,7 @@ function HostLive() {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             {!a.answered ? null
-                                            : gradingQuestion.type === 'multiple_choice' ? (
+                                            : gradingQuestion.type !== 'free_text' ? (
                                                 <span className={`font-bold px-3 py-1 rounded-lg text-sm ${a.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                                     {a.isCorrect ? `✓ ${a.points}p` : '✗'}
                                                 </span>
