@@ -2,7 +2,7 @@ import socket from '../socket'
 import { useState, useEffect, useRef } from 'react'
 import { mediaBase } from '../api'
 import AnswerDistribution from '../components/AnswerDistribution'
-import Podium from '../components/Podium'
+import FinalResults from '../components/FinalResults'
 import { sounds, startLobbyMusic, stopLobbyMusic } from '../sound'
 import Timer from '../components/Timer'
 import AnswerLetter from '../components/AnswerLetter'
@@ -15,6 +15,7 @@ function Play() {
     const [selectedAnswerId, setSelectedAnswerId] = useState(null)
     const [finished, setFinished] = useState(false)
     const [finalLeaderboard, setFinalLeaderboard] = useState(null)
+    const [finalTitles, setFinalTitles] = useState([])
     const [myResult, setMyResult] = useState(null)
     const [countdownLeft, setCountdownLeft] = useState(null)
     const countdownRef = useRef(null)
@@ -169,10 +170,11 @@ function Play() {
             setCountdownLeft(null)
             if (countdownRef.current) clearInterval(countdownRef.current)
         })
-        socket.on('session:finished', ({ leaderboard }) => {
+        socket.on('session:finished', ({ leaderboard, titles }) => {
             const me = leaderboard.find(p => p.username === usernameRef.current)
             setMyResult(me || null)
             setFinalLeaderboard(leaderboard)
+            setFinalTitles(titles || [])
             setQuestion(null)
             setGradingQuestion(null)
             if (countdownRef.current) clearInterval(countdownRef.current)
@@ -228,17 +230,17 @@ function Play() {
 
     if (joined && finished && finalLeaderboard) {
         return (
-            <div className="min-h-screen bg-purple-900 flex items-center justify-center p-6">
-                <div className="bg-white rounded-2xl p-10 shadow-2xl w-full max-w-lg">
-                    <h1 className="text-4xl font-bold text-purple-900 mb-6 text-center">Quiz ferdig!</h1>
-                    <Podium leaderboard={finalLeaderboard} me={myResult?.username} />
-                    {myResult && (
-                        <div className="bg-purple-100 rounded-xl px-5 py-3 mt-6 text-center">
-                            <p className="text-lg text-purple-700 font-semibold">Din plass: #{myResult.rank} — {myResult.score} poeng</p>
-                        </div>
-                    )}
-                </div>
-            </div>
+            <FinalResults
+                leaderboard={finalLeaderboard}
+                titles={finalTitles}
+                me={myResult?.username}
+                footer={myResult && (
+                    <div className="bg-yellow-300 rounded-2xl px-5 py-4 text-center shadow-xl">
+                        <p className="text-xl text-purple-950 font-black">Din plass: #{myResult.rank} — {myResult.score} poeng</p>
+                        <p className="text-purple-900 font-semibold">{myResult.correct} av {myResult.total} riktige</p>
+                    </div>
+                )}
+            />
         )
     }
 

@@ -4,7 +4,7 @@ import socket from '../socket'
 import TopBar from '../components/TopBar'
 import { mediaBase } from '../api'
 import AnswerDistribution from '../components/AnswerDistribution'
-import Podium from '../components/Podium'
+import FinalResults from '../components/FinalResults'
 import { sounds, startLobbyMusic, stopLobbyMusic } from '../sound'
 import Timer from '../components/Timer'
 import ResultBadge from '../components/ResultBadge'
@@ -17,6 +17,7 @@ function HostLive() {
     const [players, setPlayers] = useState([])
     const [question, setQuestion] = useState(null)
     const [leaderboard, setLeaderboard] = useState(null)
+    const [titles, setTitles] = useState([])
     const [finished, setFinished] = useState(false)
     const [timer, setTimer] = useState('')
     const [freeTextAnswers, setFreeTextAnswers] = useState({})
@@ -99,8 +100,9 @@ function HostLive() {
             setQuestion(null)
             setCountdownLeft(null)
         })
-        socket.on('session:finished', ({ leaderboard }) => {
+        socket.on('session:finished', ({ leaderboard, titles }) => {
             setLeaderboard(leaderboard)
+            setTitles(titles || [])
             setGradingQuestion(null)
             setFinished(true)
         })
@@ -179,18 +181,15 @@ function HostLive() {
 
     if (finished) {
         return (
-            <div className="min-h-screen bg-purple-900 flex items-center justify-center">
-                <div className="bg-white rounded-2xl p-10 text-center shadow-2xl w-full max-w-lg">
-                    <h1 className="text-4xl font-bold text-purple-900 mb-6">Quiz ferdig!</h1>
-                    <Podium leaderboard={leaderboard} />
-                    <button
-                        onClick={() => navigate('/host')}
-                        className="mt-6 btn btn-next btn-lg"
-                    >
+            <FinalResults
+                leaderboard={leaderboard}
+                titles={titles}
+                footer={
+                    <button onClick={() => navigate('/host')} className="btn btn-next btn-lg">
                         Tilbake til quizene
                     </button>
-                </div>
-            </div>
+                }
+            />
         )
     }
 

@@ -37,7 +37,7 @@ const titles = [
         title: 'Tøffeste kveld',
         best: 'lowest',
         score: s => s.negativePoints < 0 ? s.negativePoints : null,
-        detail: n => `${n} poeng i minus`
+        detail: n => `Fikk ${n} poeng av hosten`
     }
 ]
 

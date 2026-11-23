@@ -57,6 +57,12 @@ export const sounds = {
         tone(311, 0, 0.25, { type: 'square', volume: 0.08 })
         tone(233, 0.2, 0.4, { type: 'square', volume: 0.08 })
     },
+    // Fast low hits that swell in volume, ending just before the reveal.
+    drumroll: (seconds) => {
+        for (let t = 0; t < seconds; t += 0.06) {
+            tone(98 + (t % 0.12 < 0.06 ? 0 : 12), t, 0.05, { type: 'triangle', volume: 0.03 + 0.09 * (t / seconds) })
+        }
+    },
     fanfare: () => {
         const notes = [[523, 0], [523, 0.15], [523, 0.3], [659, 0.45], [784, 0.75], [659, 0.95], [784, 1.1]]
         notes.forEach(([f, t], i) => tone(f, t, i === notes.length - 1 ? 0.8 : 0.18, { type: 'triangle', volume: 0.16 }))
