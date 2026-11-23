@@ -214,12 +214,14 @@ function Play() {
         if (timeLeft === 0) sounds.timeUp()
     }, [timeLeft, questionOpen])
 
+    // White text is unreadable on yellow (~1.6:1), so yellow gets dark text and green a darker step.
     const answerColors = [
-        'bg-red-500 hover:bg-red-600',
-        'bg-blue-500 hover:bg-blue-600',
-        'bg-yellow-400 hover:bg-yellow-500',
-        'bg-green-500 hover:bg-green-600',
+        'bg-red-500 hover:bg-red-600 text-white',
+        'bg-blue-500 hover:bg-blue-600 text-white',
+        'bg-yellow-400 hover:bg-yellow-300 text-purple-950',
+        'bg-green-600 hover:bg-green-700 text-white',
     ]
+    const textInput = 'bg-white text-purple-900 placeholder-gray-400 rounded-xl p-4 text-xl focus:outline-none focus:ring-4 focus:ring-purple-300 disabled:opacity-60'
 
     if (joined && finished && finalLeaderboard) {
         return (
@@ -326,8 +328,13 @@ function Play() {
                     {timeLeft !== null && (
                         <p className={`text-4xl font-bold ${timeLeft <= 10 ? 'text-red-400' : 'text-white'}`}>{timeLeft}</p>
                     )}
-                    {answered && <p className="text-green-300 font-bold text-lg animate-pulse">Svar registrert — venter på neste spørsmål...</p>}
                     <h1 className="text-3xl font-bold text-white mt-2">{question.text}</h1>
+                    {/* Fixed height so the layout does not jump when the answer is registered. */}
+                    <p className="min-h-7 mt-2 text-green-300 font-bold text-lg" aria-live="polite">
+                        {answered && (question.type === 'free_text'
+                            ? '✓ Svar registrert — du kan endre det til tiden er ute'
+                            : '✓ Svar registrert — venter på neste spørsmål')}
+                    </p>
                     {question.image_path && (
                         <img
                             src={`${mediaBase}/${question.image_path}`}
@@ -371,7 +378,13 @@ function Play() {
                 <div className="flex-1 p-6">
                     {(question.type === 'multiple_choice' || question.type === 'true_false') && (
                         <div className="grid grid-cols-2 gap-4 h-full">
-                            {question.answers.map((answer, i) => (
+                            {question.answers.map((answer, i) => {
+                                const selected = selectedAnswerId === answer.id
+                                const state = selected
+                                    ? 'ring-4 ring-white ring-offset-2 ring-offset-purple-900 scale-[1.02] shadow-2xl'
+                                    : answered ? 'opacity-40 saturate-50 scale-95'
+                                    : timeLeft === 0 ? 'opacity-60' : 'hover:scale-[1.03] hover:shadow-xl'
+                                return (
                                 <button
                                     key={answer.id}
                                     onClick={() => {
@@ -383,12 +396,15 @@ function Play() {
                                         })
                                     }}
                                     disabled={answered || timeLeft === 0}
-                                    className={`${answerColors[i % 4]} text-white font-bold text-xl rounded-2xl p-6 transition-all hover:scale-[1.03] hover:shadow-xl
-  disabled:opacity-50 disabled:hover:scale-100 ${selectedAnswerId === answer.id ? 'ring-4 ring-white ring-offset-2' : ''}`}
+                                    className={`${answerColors[i % 4]} relative font-bold text-xl rounded-2xl p-6 transition-all duration-300 disabled:cursor-default ${state}`}
                                 >
                                     {answer.text}
+                                    {selected && (
+                                        <span className="absolute top-2 right-3 bg-white text-purple-900 rounded-full w-8 h-8 grid place-items-center text-base" aria-label="Ditt svar">✓</span>
+                                    )}
                                 </button>
-                            ))}
+                                )
+                            })}
                         </div>
                     )}
                     {question.type === 'ranking' && (
@@ -434,8 +450,7 @@ function Play() {
                                 inputMode="decimal"
                                 placeholder="Ditt tall"
                                 disabled={answered || timeLeft === 0}
-                                className="border-2 border-purple-300 rounded-xl p-4 text-xl text-center focus:outline-none focus:border-purple-500
-  disabled:opacity-50"
+                                className={`${textInput} text-center`}
                             />
                             <button
                                 type="submit"
@@ -458,15 +473,12 @@ function Play() {
                                 timeUsed: Date.now() - questionStartTime
                             })
                         }} className="flex flex-col gap-4 max-w-lg mx-auto mt-8">
-                            {answered && !confirmFlash && <p className="text-green-300 font-semibold text-center">Svar registrert — du kan endre det til tiden er ute</p>}
-                            {confirmFlash && <p className="text-white font-bold text-center bg-green-500 rounded-xl py-2 animate-pulse">✓ Svar registrert!</p>}
                             <input
                                 value={freeTextInput}
                                 onChange={e => setFreeTextInput(e.target.value)}
                                 placeholder="Ditt svar"
                                 disabled={timeLeft === 0}
-                                className="border-2 border-purple-300 rounded-xl p-4 text-xl focus:outline-none focus:border-purple-500
-  disabled:opacity-50"
+                                className={`${textInput} ${confirmFlash ? 'ring-4 ring-green-400' : ''} transition-shadow`}
                             />
                             <button
                                 type="submit"
