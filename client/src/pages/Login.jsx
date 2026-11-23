@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
+import { reconnectWithCurrentToken } from '../socket'
 
 function Login() {
     const [username, setUsername] = useState('')
@@ -14,6 +15,7 @@ function Login() {
             const res = await api.post('/auth/login', { username, password })
             localStorage.setItem('token', res.data.token)
             localStorage.setItem('user', JSON.stringify(res.data.user))
+            reconnectWithCurrentToken()
             navigate('/')
         } catch (err) {
             setError(err.response?.data?.error || 'Noe gikk galt')

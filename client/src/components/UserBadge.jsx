@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { reconnectWithCurrentToken } from '../socket'
 
 function UserBadge() {
     const user = JSON.parse(localStorage.getItem('user'))
@@ -7,6 +8,7 @@ function UserBadge() {
     const logout = () => {
         localStorage.removeItem('token')
         localStorage.removeItem('user')
+        reconnectWithCurrentToken()
         navigate('/login')
     }
 
