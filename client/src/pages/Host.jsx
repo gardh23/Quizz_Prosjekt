@@ -7,14 +7,20 @@ import TopBar from '../components/TopBar'
 function Host() {
     const [quizzes, setQuizzes] = useState([])
     const [newTitle, setNewTitle] = useState('')
+    const [error, setError] = useState('')
     const navigate = useNavigate()
 
     const createQuiz = async (e) => {
         e.preventDefault()
-        const res = await api.post('/quizzes', { title: newTitle })
-        const user = JSON.parse(localStorage.getItem('user'))
-        setQuizzes([{ ...res.data, created_by_username: user.username }, ...quizzes])
-        setNewTitle('')
+        setError('')
+        try {
+            const res = await api.post('/quizzes', { title: newTitle })
+            const user = JSON.parse(localStorage.getItem('user'))
+            setQuizzes([{ ...res.data, created_by_username: user.username }, ...quizzes])
+            setNewTitle('')
+        } catch (err) {
+            setError(err.response?.data?.error || 'Kunne ikke opprette quizen')
+        }
     }
 
     const deleteQuiz = async (quizId, title) => {
@@ -23,11 +29,21 @@ function Host() {
         setQuizzes(quizzes.filter(q => q.id !== quizId))
     }
 
+    // The server answers host:create with either host:created or an error; show the error
+    // instead of a Start button that silently does nothing.
     const startQuiz = (quizId) => {
-        socket.emit('host:create', { quizId })
-        socket.once('host:created', ({ roomCode }) => {
+        setError('')
+        const onCreated = ({ roomCode }) => {
+            socket.off('error', onError)
             navigate(`/host/live/${roomCode}`)
-        })
+        }
+        const onError = ({ message }) => {
+            socket.off('host:created', onCreated)
+            setError(message === 'Ikke tilgang' ? 'Du har ikke tilgang til å starte quizer. Logg ut og inn igjen.' : message)
+        }
+        socket.once('host:created', onCreated)
+        socket.once('error', onError)
+        socket.emit('host:create', { quizId })
     }
 
     useEffect(() => {
@@ -39,6 +55,7 @@ function Host() {
             <TopBar />
             <h1 className="text-4xl font-bold text-white text-center mb-8">Host-meny</h1>
             <div className="max-w-2xl mx-auto">
+                {error && <p role="alert" className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-center motion-safe:animate-rise">{error}</p>}
                 <form onSubmit={createQuiz} className="flex gap-3 mb-8">
                     <input
                         value={newTitle}

@@ -1,4 +1,5 @@
 import { io } from 'socket.io-client'
+import './session'
 
 // auth as a function is re-read on every (re)connect, so the socket picks up
 // a token stored after the page loaded.

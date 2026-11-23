@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import { reconnectWithCurrentToken } from '../socket'
+import { takeExpiredNotice } from '../session'
 
 function Login() {
     const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
+    const [expired] = useState(takeExpiredNotice)
     const navigate = useNavigate()
 
     const handleSubmit = async (e) => {
@@ -26,7 +28,12 @@ function Login() {
         <div className="min-h-screen bg-purple-900 flex items-center justify-center">
             <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
                 <h1 className="text-4xl font-bold text-center text-purple-900 mb-8">Quizz</h1>
-                {error && <p className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-center">{error}</p>}
+                {expired && !error && (
+                    <p role="status" className="bg-amber-100 text-amber-800 p-3 rounded-lg mb-4 text-center">
+                        Innloggingen har gått ut — logg inn igjen.
+                    </p>
+                )}
+                {error && <p role="alert" className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-center">{error}</p>}
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                     <input
                         value={username}
