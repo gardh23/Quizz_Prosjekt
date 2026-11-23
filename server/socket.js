@@ -80,22 +80,29 @@ function precisionPoints(precision, speedBonus) {
 
 function buildPlayerAnswers(session, question) {
     return Object.entries(session.players).map(([socketId, player]) => {
+        const row = describeAnswer(socketId, player, question)
         const ans = player.answers[question.id]
-        if (!ans) return { username: player.username, socketId, answered: false }
-        if (question.type === 'number_estimate') {
-            return { username: player.username, socketId, answered: true, answerText: String(ans.numberResponse), percentOff: ans.percentOff, isCorrect: ans.isCorrect, points: ans.points }
-        }
-        if (question.type === 'ranking') {
-            const textOf = id => (question.answers || []).find(a => a && a.id === id)?.text ?? '?'
-            return { username: player.username, socketId, answered: true, answerText: ans.ranking.map(textOf).join(' → '), correctPositions: ans.correctPositions, totalPositions: ans.totalPositions, isCorrect: ans.isCorrect, points: ans.points }
-        }
-        if (isChoice(question.type)) {
-            const answerObj = (question.answers || []).find(a => a.id === ans.answerId)
-            return { username: player.username, socketId, answered: true, answerText: answerObj ? answerObj.text : '?', isCorrect: ans.isCorrect, points: ans.points }
-        } else {
-            return { username: player.username, socketId, answered: !!ans.freeTextResponse, freeTextResponse: ans.freeTextResponse || '', isCorrect: ans.isCorrect, points: ans.points, graded: !!ans.graded }
-        }
+        // manual: the host has set these points by hand (host:set_points).
+        return ans ? { ...row, manual: !!ans.manual } : row
     })
+}
+
+function describeAnswer(socketId, player, question) {
+    const ans = player.answers[question.id]
+    if (!ans) return { username: player.username, socketId, answered: false }
+    if (question.type === 'number_estimate') {
+        return { username: player.username, socketId, answered: true, answerText: String(ans.numberResponse), percentOff: ans.percentOff, isCorrect: ans.isCorrect, points: ans.points }
+    }
+    if (question.type === 'ranking') {
+        const textOf = id => (question.answers || []).find(a => a && a.id === id)?.text ?? '?'
+        return { username: player.username, socketId, answered: true, answerText: ans.ranking.map(textOf).join(' → '), correctPositions: ans.correctPositions, totalPositions: ans.totalPositions, isCorrect: ans.isCorrect, points: ans.points }
+    }
+    if (isChoice(question.type)) {
+        const answerObj = (question.answers || []).find(a => a.id === ans.answerId)
+        return { username: player.username, socketId, answered: true, answerText: answerObj ? answerObj.text : '?', isCorrect: ans.isCorrect, points: ans.points }
+    } else {
+        return { username: player.username, socketId, answered: !!ans.freeTextResponse, freeTextResponse: ans.freeTextResponse || '', isCorrect: ans.isCorrect, points: ans.points, graded: !!ans.graded }
+    }
 }
 
 // Players must never see is_correct or the free-text key before the grading phase.
@@ -659,9 +666,47 @@ module.exports = function (io, db = pool, {
             ans.isCorrect = isCorrect
             ans.graded = true
             ans.points = points
+            ans.manual = false
 
             // Only the host gets the verdict directly; players see it through the grading view once revealed.
             socket.emit('session:answer_graded', { username: player.username, isCorrect, points })
+            emitGrading(roomCode, session)
+        })
+
+        // Any question type: the host sets a player's points for the current grading question
+        // to an exact value (may exceed 1, may be negative). It replaces, never adds to, the old value.
+        on('host:set_points', ({ roomCode, playerId, points }) => {
+            if (!socket.user || (socket.user.role !== 'host' && socket.user.role !== 'admin')) {
+                socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
+            const session = sessions[roomCode]
+            if (!session || session.host !== socket.id) {
+                socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
+            if (session.status !== 'grading') {
+                socket.emit('error', { message: 'Poeng kan bare settes i rettefasen' })
+                return
+            }
+            if (!Number.isInteger(points) || Math.abs(points) > 100000) {
+                socket.emit('error', { message: 'Ugyldig poengsum' })
+                return
+            }
+
+            const player = session.players[playerId]
+            const question = session.questions[session.gradingIndex]
+            const ans = player?.answers[question.id]
+            if (!ans) {
+                socket.emit('error', { message: 'Spilleren har ikke svart på dette spørsmålet' })
+                return
+            }
+
+            player.score += points - ans.points
+            ans.points = points
+            ans.isCorrect = points > 0
+            ans.graded = true
+            ans.manual = true
             emitGrading(roomCode, session)
         })
 
