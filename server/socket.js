@@ -196,10 +196,29 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
                 return
             }
 
-            const questionsResult = await db.query(
-                'SELECT questions.*, json_agg(answers.*) as answers FROM questions LEFT JOIN answers ON answers.question_id = questions.id WHERE questions.quiz_id = $1 GROUP BY questions.id ORDER BY questions.order_index',
-                [session.quizId]
-            )
+            if (session.status !== 'waiting') {
+                socket.emit('error', { message: 'Quizen er allerede startet' })
+                return
+            }
+
+            // Set before the await so a double click cannot start the game twice.
+            session.status = 'starting'
+            let questionsResult
+            try {
+                questionsResult = await db.query(
+                    'SELECT questions.*, json_agg(answers.*) as answers FROM questions LEFT JOIN answers ON answers.question_id = questions.id WHERE questions.quiz_id = $1 GROUP BY questions.id ORDER BY questions.order_index',
+                    [session.quizId]
+                )
+            } catch (err) {
+                session.status = 'waiting'
+                throw err
+            }
+
+            if (questionsResult.rows.length === 0) {
+                session.status = 'waiting'
+                socket.emit('error', { message: 'Quizen har ingen spørsmål' })
+                return
+            }
 
             session.questions = questionsResult.rows
             session.speedBonus = speedBonus || false
@@ -289,6 +308,12 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
                 return
             }
 
+            // questionStartedAt is null during the countdown, so a second click there is ignored.
+            if (session.status !== 'active' || !session.questionStartedAt) {
+                socket.emit('error', { message: 'Kan ikke gå videre nå' })
+                return
+            }
+
             session.currentQuestion++
 
             if (session.currentQuestion >= session.questions.length) {
@@ -309,6 +334,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
 
             const question = session.questions[session.currentQuestion]
             setTimeout(() => {
+                if (sessions[roomCode] !== session) return
                 openQuestion(session)
                 emitQuestion(io, roomCode, session, 'session:question', { question, index: session.currentQuestion, total: session.questions.length })
             }, countdownSeconds * 1000)
@@ -322,6 +348,11 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
             const session = sessions[roomCode]
             if (!session || session.host !== socket.id) {
                 socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
+
+            if (session.status !== 'grading') {
+                socket.emit('error', { message: 'Ikke i rettefasen' })
                 return
             }
 
@@ -381,26 +412,38 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
                 return
             }
 
+            if (session.status !== 'grading') {
+                socket.emit('error', { message: 'Svar kan bare rettes i rettefasen' })
+                return
+            }
+            if (typeof isCorrect !== 'boolean') {
+                socket.emit('error', { message: 'Ugyldig vurdering' })
+                return
+            }
+
             const player = session.players[playerId]
             if (!player) return
 
-            const questionIndex = session.status === 'grading' ? session.gradingIndex : session.currentQuestion
-            const question = session.questions?.[questionIndex]
-            if (!question || !player.answers[question.id]) {
+            const question = session.questions[session.gradingIndex]
+            const ans = player.answers[question.id]
+            if (!ans) {
                 socket.emit('error', { message: 'Spilleren har ikke svart på dette spørsmålet' })
+                return
+            }
+            if (question.type !== 'free_text') {
+                socket.emit('error', { message: 'Bare fritekst-svar rettes manuelt' })
                 return
             }
 
             const points = isCorrect
-                ? session.speedBonus
-                    ? speedPoints(player.answers[question.id].timeUsed, player.answers[question.id].allowedMs)
-                    : 1
+                ? session.speedBonus ? speedPoints(ans.timeUsed, ans.allowedMs) : 1
                 : 0
 
-            player.answers[question.id].isCorrect = isCorrect
-            player.answers[question.id].graded = true
-            player.answers[question.id].points = points
-            player.score += points
+            // Re-grading replaces the earlier grade instead of adding to it.
+            player.score += points - (ans.graded ? ans.points : 0)
+            ans.isCorrect = isCorrect
+            ans.graded = true
+            ans.points = points
 
             io.to(roomCode).emit('session:answer_graded', { username: player.username, isCorrect, points })
             io.to(roomCode).emit('session:players', { players: publicPlayers(session) })
