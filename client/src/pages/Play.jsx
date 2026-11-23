@@ -18,10 +18,18 @@ function Play() {
     const [myResult, setMyResult] = useState(null)
     const [countdownLeft, setCountdownLeft] = useState(null)
     const countdownRef = useRef(null)
-    // The host's invite link carries ?rom=CODE so players only have to type their name.
-    const [roomCode, setRoomCode] = useState(() => new URLSearchParams(window.location.search).get('rom') || '')
-    const [username, setUsername] = useState('')
-    const usernameRef = useRef('')
+    // Saved at join time so a page refresh mid-game can rejoin.
+    const [savedPlayer] = useState(() => {
+        try {
+            return JSON.parse(sessionStorage.getItem('quizz_player'))
+        } catch {
+            return null
+        }
+    })
+    // Otherwise the host's invite link carries ?rom=CODE so players only have to type their name.
+    const [roomCode, setRoomCode] = useState(() => savedPlayer?.roomCode || new URLSearchParams(window.location.search).get('rom') || '')
+    const [username, setUsername] = useState(savedPlayer?.username || '')
+    const usernameRef = useRef(savedPlayer?.username || '')
     const [joined, setJoined] = useState(false)
     const [error, setError] = useState('')
     const isRejoinAttemptRef = useRef(false)
@@ -59,16 +67,10 @@ function Play() {
     }
 
     useEffect(() => {
-        const saved = sessionStorage.getItem('quizz_player')
-        if (saved) {
-            const { roomCode: savedRoom, username: savedUsername } = JSON.parse(saved)
-            setRoomCode(savedRoom)
-            setUsername(savedUsername)
-            usernameRef.current = savedUsername
-            isRejoinAttemptRef.current = true
-            socket.emit('player:rejoin', { roomCode: savedRoom, username: savedUsername })
-        }
-    }, [])
+        if (!savedPlayer) return
+        isRejoinAttemptRef.current = true
+        socket.emit('player:rejoin', { roomCode: savedPlayer.roomCode, username: savedPlayer.username })
+    }, [savedPlayer])
 
     const normalizeRoomCode = (raw) =>
         raw.trim().split(/[\s-]+/).join('-').toUpperCase()
