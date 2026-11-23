@@ -4,6 +4,7 @@ import socket from '../socket'
 import UserBadge from '../components/UserBadge'
 import { mediaBase } from '../api'
 import AnswerDistribution from '../components/AnswerDistribution'
+import Podium from '../components/Podium'
 
 function HostLive() {
     const { roomCode } = useParams()
@@ -143,14 +144,13 @@ function HostLive() {
             <div className="min-h-screen bg-purple-900 flex items-center justify-center">
                 <div className="bg-white rounded-2xl p-10 text-center shadow-2xl w-full max-w-lg">
                     <h1 className="text-4xl font-bold text-purple-900 mb-6">Quiz ferdig!</h1>
-                    <div className="flex flex-col gap-3">
-                        {leaderboard.map(p => (
-                            <div key={p.username} className="flex items-center justify-between bg-purple-100 rounded-xl px-5 py-3">
-                                <span className="font-bold text-purple-900">#{p.rank} {p.username}</span>
-                                <span className="text-purple-600 font-bold">{p.score} poeng</span>
-                            </div>
-                        ))}
-                    </div>
+                    <Podium leaderboard={leaderboard} />
+                    <button
+                        onClick={() => navigate('/host')}
+                        className="mt-6 bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-xl transition-colors"
+                    >
+                        Tilbake til quizene
+                    </button>
                 </div>
             </div>
         )

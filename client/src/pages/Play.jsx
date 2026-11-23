@@ -2,6 +2,7 @@ import socket from '../socket'
 import { useState, useEffect, useRef } from 'react'
 import { mediaBase } from '../api'
 import AnswerDistribution from '../components/AnswerDistribution'
+import Podium from '../components/Podium'
 
 function Play() {
     const [answered, setAnswered] = useState(false)
@@ -193,21 +194,14 @@ function Play() {
     if (joined && finished && finalLeaderboard) {
         return (
             <div className="min-h-screen bg-purple-900 flex items-center justify-center p-6">
-                <div className="bg-white rounded-2xl p-10 shadow-2xl w-full max-w-md">
+                <div className="bg-white rounded-2xl p-10 shadow-2xl w-full max-w-lg">
                     <h1 className="text-4xl font-bold text-purple-900 mb-6 text-center">Quiz ferdig!</h1>
+                    <Podium leaderboard={finalLeaderboard} me={myResult?.username} />
                     {myResult && (
-                        <div className="bg-purple-100 rounded-xl px-5 py-3 mb-6 text-center">
+                        <div className="bg-purple-100 rounded-xl px-5 py-3 mt-6 text-center">
                             <p className="text-lg text-purple-700 font-semibold">Din plass: #{myResult.rank} — {myResult.score} poeng</p>
                         </div>
                     )}
-                    <div className="flex flex-col gap-2">
-                        {finalLeaderboard.map(p => (
-                            <div key={p.username} className={`flex items-center justify-between rounded-xl px-5 py-3 ${myResult && p.username === myResult.username ? 'bg-purple-200' : 'bg-purple-50'}`}>
-                                <span className="font-bold text-purple-900">#{p.rank} {p.username}</span>
-                                <span className="text-purple-600 font-bold">{p.score} poeng</span>
-                            </div>
-                        ))}
-                    </div>
                 </div>
             </div>
         )
