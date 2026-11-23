@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import socket from '../socket'
-import UserBadge from '../components/UserBadge'
+import TopBar from '../components/TopBar'
 import { mediaBase } from '../api'
 import AnswerDistribution from '../components/AnswerDistribution'
 import Podium from '../components/Podium'
@@ -166,7 +166,7 @@ function HostLive() {
                     <Podium leaderboard={leaderboard} />
                     <button
                         onClick={() => navigate('/host')}
-                        className="mt-6 bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-xl transition-colors"
+                        className="mt-6 btn btn-next btn-lg"
                     >
                         Tilbake til quizene
                     </button>
@@ -182,7 +182,7 @@ function HostLive() {
             : gradingQuestion.answers?.filter(a => a.is_correct) || []
         return (
             <div className="min-h-screen bg-purple-900 p-8">
-                <UserBadge />
+                <TopBar />
                 <div className="max-w-2xl mx-auto">
                     <div className="flex items-center justify-between mb-6">
                         <h1 className="text-2xl font-bold text-white">
@@ -243,13 +243,13 @@ function HostLive() {
                                                 <>
                                                     <button
                                                         onClick={() => socket.emit('host:grade', { roomCode, playerId: a.socketId, isCorrect: true })}
-                                                        className="bg-green-500 hover:bg-green-600 text-white font-bold px-3 py-1 rounded-lg transition-colors text-sm"
+                                                        className="btn btn-go px-3 py-1 rounded-lg text-sm"
                                                     >
                                                         Riktig
                                                     </button>
                                                     <button
                                                         onClick={() => socket.emit('host:grade', { roomCode, playerId: a.socketId, isCorrect: false })}
-                                                        className="bg-red-500 hover:bg-red-600 text-white font-bold px-3 py-1 rounded-lg transition-colors text-sm"
+                                                        className="btn btn-danger px-3 py-1 rounded-lg text-sm"
                                                     >
                                                         Feil
                                                     </button>
@@ -264,7 +264,7 @@ function HostLive() {
 
                     <button
                         onClick={() => socket.emit('host:grading_next', { roomCode })}
-                        className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold text-xl py-4 rounded-2xl transition-colors"
+                        className="btn btn-next btn-lg"
                     >
                         {gradingIndex + 1 < gradingTotal ? 'Neste spørsmål →' : 'Vis leaderboard'}
                     </button>
@@ -275,7 +275,8 @@ function HostLive() {
 
     return (
         <div className="min-h-screen bg-purple-900 p-8">
-            <UserBadge />
+            {/* Leaving is only offered in the lobby; mid-game it would strand the players. */}
+            <TopBar onBack={phase === 'waiting' && !question && countdownLeft === null ? () => navigate('/host') : undefined} />
             <div className="max-w-2xl mx-auto">
                 <div className="flex items-center justify-between mb-6">
                     <h1 className="text-3xl font-bold text-white">Romkode: <span className="text-yellow-300">{roomCode}</span></h1>
@@ -286,12 +287,6 @@ function HostLive() {
 
                 {phase === 'waiting' && !question && countdownLeft === null && (
                     <div>
-                        <button
-                            onClick={() => navigate('/host')}
-                            className="fixed top-4 left-4 bg-white text-purple-900 font-bold px-4 py-2 rounded-xl shadow-lg hover:bg-purple-100 transition-colors z-50"
-                        >
-                            ← Tilbake
-                        </button>
                         <div className="flex flex-wrap gap-2 mb-6">
                             {players.map((p, i) => (
                                 <span key={i} className="bg-white text-purple-900 font-semibold px-4 py-2 rounded-full">{p.username}</span>
@@ -308,7 +303,7 @@ function HostLive() {
                         </label>
                         <button
                             onClick={() => socket.emit('host:start', { roomCode, speedBonus })}
-                            className="w-full bg-green-500 hover:bg-green-600 text-white font-bold text-2xl py-5 rounded-2xl transition-colors"
+                            className="btn btn-go btn-lg text-2xl py-5"
                         >
                             Start quiz
                         </button>
@@ -376,7 +371,7 @@ function HostLive() {
                             />
                             <button
                                 type="submit"
-                                className="bg-yellow-400 hover:bg-yellow-500 text-purple-900 font-bold px-5 py-3 rounded-xl transition-colors"
+                                className="btn btn-soft"
                             >
                                 Sett timer
                             </button>
@@ -384,7 +379,7 @@ function HostLive() {
 
                         <button
                             onClick={next}
-                            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold text-xl py-4 rounded-2xl transition-colors"
+                            className="btn btn-next btn-lg"
                         >
                             Neste spørsmål
                         </button>

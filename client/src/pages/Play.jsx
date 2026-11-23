@@ -396,7 +396,7 @@ function Play() {
                                         })
                                     }}
                                     disabled={answered || timeLeft === 0}
-                                    className={`${answerColors[i % 4]} relative font-bold text-xl rounded-2xl p-6 transition-all duration-300 disabled:cursor-default ${state}`}
+                                    className={`${answerColors[i % 4]} relative font-bold text-xl rounded-2xl p-6 transition-all duration-300 disabled:cursor-default focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-yellow-300 ${state}`}
                                 >
                                     {answer.text}
                                     {selected && (
@@ -421,17 +421,16 @@ function Play() {
                                         <span className="w-6 font-bold text-purple-700">{i + 1}.</span>
                                         <span className="flex-1 text-lg font-semibold text-purple-900">{item.text}</span>
                                         <button type="button" aria-label={`Flytt ${item.text} opp`} onClick={() => move(i - 1)} disabled={locked || i === 0}
-                                            className="bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold w-10 h-10 rounded-lg disabled:opacity-30">▲</button>
+                                            className="btn btn-soft w-10 h-10 p-0 rounded-lg disabled:opacity-30">▲</button>
                                         <button type="button" aria-label={`Flytt ${item.text} ned`} onClick={() => move(i + 1)} disabled={locked || i === rankingOrder.length - 1}
-                                            className="bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold w-10 h-10 rounded-lg disabled:opacity-30">▼</button>
+                                            className="btn btn-soft w-10 h-10 p-0 rounded-lg disabled:opacity-30">▼</button>
                                     </div>
                                 )
                             })}
                             <button
                                 onClick={() => socket.emit('player:answer', { roomCode, ranking: rankingOrder.map(a => a.id) })}
                                 disabled={answered || timeLeft === 0}
-                                className="bg-green-500 hover:bg-green-600 text-white font-bold text-xl py-4 rounded-xl transition-colors
-  disabled:opacity-50"
+                                className="btn btn-go btn-lg"
                             >
                                 Send rekkefølge
                             </button>
@@ -455,8 +454,7 @@ function Play() {
                             <button
                                 type="submit"
                                 disabled={answered || timeLeft === 0}
-                                className="bg-green-500 hover:bg-green-600 text-white font-bold text-xl py-4 rounded-xl transition-colors
-  disabled:opacity-50"
+                                className="btn btn-go btn-lg"
                             >
                                 Send svar
                             </button>
@@ -483,8 +481,7 @@ function Play() {
                             <button
                                 type="submit"
                                 disabled={timeLeft === 0}
-                                className="bg-green-500 hover:bg-green-600 text-white font-bold text-xl py-4 rounded-xl transition-colors
-  disabled:opacity-50"
+                                className="btn btn-go btn-lg"
                             >
                                 {answered ? 'Oppdater svar' : 'Send svar'}
                             </button>
@@ -522,17 +519,17 @@ function Play() {
                         value={roomCode}
                         onChange={e => setRoomCode(e.target.value)}
                         placeholder="f.eks. glad-hest"
-                        className="border-2 border-gray-200 rounded-xl p-3 text-lg text-center focus:outline-none focus:border-purple-500"
+                        className="field text-center"
                     />
                     <input
                         value={username}
                         onChange={e => setUsername(e.target.value)}
                         placeholder="Brukernavn"
-                        className="border-2 border-gray-200 rounded-xl p-3 text-lg focus:outline-none focus:border-purple-500"
+                        className="field"
                     />
                     <button
                         type="submit"
-                        className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xl py-3 rounded-xl transition-colors"
+                        className="btn btn-go btn-lg"
                     >
                         Bli med
                     </button>

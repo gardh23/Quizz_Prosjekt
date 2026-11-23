@@ -1,1 +1,29 @@
 @import "tailwindcss";
+
+/*
+ * Button roles, defined once:
+ *   go     — start, send, create, join (moves the user forward)
+ *   next   — host advancing the game
+ *   soft   — secondary actions
+ *   danger — destructive or "wrong"
+ * The focus ring is yellow with a dark gap so it shows on both purple and white.
+ */
+@layer components {
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 font-bold rounded-xl px-5 py-3 transition cursor-pointer
+            active:scale-95 disabled:opacity-40 disabled:cursor-default disabled:active:scale-100
+            focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 focus-visible:ring-offset-purple-900;
+    }
+    .btn-go { @apply bg-green-600 hover:bg-green-700 text-white; }
+    .btn-next { @apply bg-blue-600 hover:bg-blue-700 text-white; }
+    .btn-soft { @apply bg-purple-100 hover:bg-purple-200 text-purple-800; }
+    .btn-ghost { @apply bg-purple-700 hover:bg-purple-600 text-white; }
+    .btn-danger { @apply bg-red-600 hover:bg-red-700 text-white; }
+    .btn-danger-soft { @apply bg-red-100 hover:bg-red-200 text-red-700; }
+    .btn-lg { @apply w-full text-xl py-4 rounded-2xl; }
+
+    .field {
+        @apply bg-white text-purple-900 placeholder-gray-400 border-2 border-gray-200 rounded-xl p-3 text-lg
+            focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-200;
+    }
+}

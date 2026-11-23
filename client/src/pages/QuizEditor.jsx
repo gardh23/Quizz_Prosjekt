@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api, { mediaBase } from '../api'
-import UserBadge from '../components/UserBadge'
+import TopBar from '../components/TopBar'
 
 const emptyAnswers = [
     { text: '', is_correct: false },
@@ -118,13 +118,7 @@ function QuizEditor() {
 
     return (
         <div className="min-h-screen bg-purple-900 p-8">
-            <UserBadge />
-            <button
-                onClick={() => navigate('/host')}
-                className="fixed top-4 left-4 bg-white text-purple-900 font-bold px-4 py-2 rounded-xl shadow-lg hover:bg-purple-100 transition-colors z-50"
-            >
-                ← Tilbake
-            </button>
+            <TopBar onBack={() => navigate('/host')} />
             <div className="max-w-2xl mx-auto">
                 {editingTitle ? (
                     <div className="flex gap-3 mb-8">
@@ -135,15 +129,15 @@ function QuizEditor() {
                             autoFocus
                             className="flex-1 text-2xl font-bold rounded-xl px-4 py-2 focus:outline-none focus:border-white border-2 border-purple-400 bg-purple-800 text-white"
                         />
-                        <button onClick={saveTitle} className="bg-green-500 hover:bg-green-600 text-white font-bold px-5 py-2 rounded-xl transition-colors">Lagre</button>
-                        <button onClick={() => setEditingTitle(false)} className="bg-gray-500 hover:bg-gray-600 text-white font-bold px-5 py-2 rounded-xl transition-colors">Avbryt</button>
+                        <button onClick={saveTitle} className="btn btn-go">Lagre</button>
+                        <button onClick={() => setEditingTitle(false)} className="btn btn-soft">Avbryt</button>
                     </div>
                 ) : (
                     <div className="flex items-center gap-3 mb-8">
                         <h1 className="text-4xl font-bold text-white">{quiz.title}</h1>
                         <button
                             onClick={() => { setTitleInput(quiz.title); setEditingTitle(true) }}
-                            className="bg-purple-700 hover:bg-purple-600 text-white px-3 py-1 rounded-lg text-sm transition-colors"
+                            className="btn btn-ghost text-sm px-3 py-1 rounded-lg"
                         >
                             ✏️ Endre navn
                         </button>
@@ -160,13 +154,13 @@ function QuizEditor() {
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => startEdit(q)}
-                                        className="bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold px-4 py-2 rounded-xl transition-colors"
+                                        className="btn btn-soft px-4 py-2"
                                     >
                                         Rediger
                                     </button>
                                     <button
                                         onClick={() => deleteQuestion(q.id)}
-                                        className="bg-red-100 hover:bg-red-200 text-red-700 font-bold px-4 py-2 rounded-xl transition-colors"
+                                        className="btn btn-danger-soft px-4 py-2"
                                     >
                                         Slett
                                     </button>
@@ -187,7 +181,7 @@ function QuizEditor() {
                                 setType(e.target.value)
                                 setAnswers(defaultAnswers(e.target.value))
                             }}
-                            className="border-2 border-gray-200 rounded-xl p-3 text-lg focus:outline-none focus:border-purple-500"
+                            className="field"
                         >
                             <option value="multiple_choice">Flervalg</option>
                             <option value="free_text">Fritekst</option>
@@ -200,7 +194,7 @@ function QuizEditor() {
                             value={text}
                             onChange={e => setText(e.target.value)}
                             placeholder="Spørsmålstekst"
-                            className="border-2 border-gray-200 rounded-xl p-3 text-lg focus:outline-none focus:border-purple-500"
+                            className="field"
                         />
 
                         <input
@@ -208,7 +202,7 @@ function QuizEditor() {
                             value={timeLimit}
                             onChange={e => setTimeLimit(e.target.value)}
                             placeholder="Tidsbegrensning (sekunder)"
-                            className="border-2 border-gray-200 rounded-xl p-3 text-lg focus:outline-none focus:border-purple-500"
+                            className="field"
                         />
 
                         <div className="flex flex-col gap-2">
@@ -267,7 +261,7 @@ function QuizEditor() {
                                         setAnswers(updated)
                                     }}
                                     placeholder={`Svar ${i + 1}`}
-                                    className="flex-1 border-2 border-gray-200 rounded-xl p-3 focus:outline-none focus:border-purple-500"
+                                    className="field flex-1 text-base"
                                 />
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input
@@ -317,7 +311,7 @@ function QuizEditor() {
                                                 setAnswers(updated)
                                             }}
                                             placeholder={i === 0 ? 'Først' : `Plass ${i + 1}`}
-                                            className="flex-1 border-2 border-gray-200 rounded-xl p-3 focus:outline-none focus:border-purple-500"
+                                            className="field flex-1 text-base"
                                         />
                                     </div>
                                 ))}
@@ -332,7 +326,7 @@ function QuizEditor() {
                                     value={answers[0]?.text || ''}
                                     onChange={e => setAnswers([{ text: e.target.value, is_correct: true }])}
                                     placeholder="Riktig tall"
-                                    className="border-2 border-gray-200 rounded-xl p-3 text-lg focus:outline-none focus:border-purple-500"
+                                    className="field"
                                 />
                                 <p className="text-sm text-gray-500">Poeng etter hvor nær spillerne er. Uten hastighetsbonus gir høyst 25 % feil 1 poeng.</p>
                             </div>
@@ -343,14 +337,14 @@ function QuizEditor() {
                                 value={answers[0]?.text || ''}
                                 onChange={e => setAnswers([{ text: e.target.value, is_correct: true }])}
                                 placeholder="Fasit"
-                                className="border-2 border-gray-200 rounded-xl p-3 text-lg focus:outline-none focus:border-purple-500"
+                                className="field"
                             />
                         )}
 
                         <div className="flex gap-3">
                             <button
                                 type="submit"
-                                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xl py-3 rounded-xl transition-colors"
+                                className="flex-1 btn btn-go text-xl"
                             >
                                 {editingQuestion ? 'Oppdater spørsmål' : 'Legg til spørsmål'}
                             </button>
@@ -358,7 +352,7 @@ function QuizEditor() {
                                 <button
                                     type="button"
                                     onClick={resetForm}
-                                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-6 py-3 rounded-xl transition-colors"
+                                    className="btn btn-soft px-6"
                                 >
                                     Avbryt
                                 </button>

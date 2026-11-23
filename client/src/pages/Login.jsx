@@ -32,18 +32,18 @@ function Login() {
                         value={username}
                         onChange={e => setUsername(e.target.value)}
                         placeholder="Brukernavn"
-                        className="border-2 border-gray-200 rounded-xl p-3 text-lg focus:outline-none focus:border-purple-500"
+                        className="field"
                     />
                     <input
                         value={password}
                         onChange={e => setPassword(e.target.value)}
                         placeholder="Passord"
                         type="password"
-                        className="border-2 border-gray-200 rounded-xl p-3 text-lg focus:outline-none focus:border-purple-500"
+                        className="field"
                     />
                     <button
                         type="submit"
-                        className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xl py-3 rounded-xl transition-colors"
+                        className="btn btn-go btn-lg"
                     >
                         Logg inn
                     </button>
@@ -52,7 +52,7 @@ function Login() {
                 <p className="text-center text-gray-500 mb-3">Er du spiller?</p>
                 <button
                     onClick={() => navigate('/play')}
-                    className="w-full bg-green-500 hover:bg-green-600 text-white font-bold text-xl py-3 rounded-xl transition-colors"
+                    className="btn btn-next btn-lg"
                 >
                     Bli med i quiz
                 </button>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../api'
-import UserBadge from '../components/UserBadge'
+import TopBar from '../components/TopBar'
 
 function Admin() {
     const [users, setUsers] = useState([])
@@ -22,7 +22,7 @@ function Admin() {
 
     return (
         <div className="min-h-screen bg-purple-900 p-8">
-            <UserBadge />
+            <TopBar />
             <div className="max-w-2xl mx-auto">
                 <h1 className="text-4xl font-bold text-white mb-8">Admin-panel</h1>
                 <div className="flex flex-col gap-4">
@@ -41,7 +41,7 @@ function Admin() {
                                 </select>
                                 <button
                                     onClick={() => deleteUser(user.id, user.username)}
-                                    className="bg-red-100 hover:bg-red-200 text-red-700 font-bold px-4 py-2 rounded-xl transition-colors"
+                                    className="btn btn-danger-soft px-4 py-2"
                                 >
                                     Slett
                                 </button>

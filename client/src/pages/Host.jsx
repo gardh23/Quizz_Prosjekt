@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../api'
 import socket from '../socket'
 import { useNavigate } from 'react-router-dom'
-import UserBadge from '../components/UserBadge'
+import TopBar from '../components/TopBar'
 
 function Host() {
     const [quizzes, setQuizzes] = useState([])
@@ -36,7 +36,7 @@ function Host() {
 
     return (
         <div className="min-h-screen bg-purple-900 p-8">
-            <UserBadge />
+            <TopBar />
             <h1 className="text-4xl font-bold text-white text-center mb-8">Host-meny</h1>
             <div className="max-w-2xl mx-auto">
                 <form onSubmit={createQuiz} className="flex gap-3 mb-8">
@@ -48,7 +48,7 @@ function Host() {
                     />
                     <button
                         type="submit"
-                        className="bg-green-500 hover:bg-green-600 text-white font-bold px-6 py-3 rounded-xl transition-colors"
+                        className="btn btn-go px-6"
                     >
                         Opprett
                     </button>
@@ -65,19 +65,19 @@ function Host() {
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => navigate(`/quiz/${quiz.id}/edit`)}
-                                    className="bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold px-4 py-2 rounded-xl transition-colors"
+                                    className="btn btn-soft px-4 py-2"
                                 >
                                     Rediger
                                 </button>
                                 <button
                                     onClick={() => startQuiz(quiz.id)}
-                                    className="bg-green-500 hover:bg-green-600 text-white font-bold px-4 py-2 rounded-xl transition-colors"
+                                    className="btn btn-go px-4 py-2"
                                 >
                                     Start
                                 </button>
                                 <button
                                     onClick={() => deleteQuiz(quiz.id, quiz.title)}
-                                    className="bg-red-100 hover:bg-red-200 text-red-700 font-bold px-4 py-2 rounded-xl transition-colors"
+                                    className="btn btn-danger-soft px-4 py-2"
                                 >
                                     Slett
                                 </button>
