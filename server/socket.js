@@ -174,6 +174,29 @@ module.exports = function (io, db = pool, {
 } = {}) {
     const sessions = {}
 
+    function emitGrading(roomCode, session) {
+        io.to(roomCode).emit('session:grading_question', gradingPayload(session))
+    }
+
+    function startGrading(roomCode, session) {
+        session.status = 'grading'
+        session.gradingIndex = 0
+        emitGrading(roomCode, session)
+    }
+
+    function finishGame(roomCode, session) {
+        const sorted = Object.values(session.players).sort((a, b) => b.score - a.score)
+        // Ties share a place and the next place is skipped (1, 1, 3).
+        const leaderboard = sorted.map(p => ({
+            username: p.username,
+            score: p.score,
+            rank: 1 + sorted.filter(other => other.score > p.score).length
+        }))
+        session.status = 'finished'
+        io.to(roomCode).emit('session:finished', { leaderboard })
+        delete sessions[roomCode]
+    }
+
     setInterval(() => {
         const now = Date.now()
         for (const roomCode in sessions) {
@@ -457,9 +480,7 @@ module.exports = function (io, db = pool, {
             session.currentQuestion++
 
             if (session.currentQuestion >= session.questions.length) {
-                session.status = 'grading'
-                session.gradingIndex = 0
-                io.to(roomCode).emit('session:grading_question', gradingPayload(session))
+                startGrading(roomCode, session)
                 return
             }
 
@@ -493,20 +514,11 @@ module.exports = function (io, db = pool, {
             session.gradingIndex++
 
             if (session.gradingIndex >= session.questions.length) {
-                const sorted = Object.values(session.players).sort((a, b) => b.score - a.score)
-                // Ties share a place and the next place is skipped (1, 1, 3).
-                const leaderboard = sorted.map(p => ({
-                    username: p.username,
-                    score: p.score,
-                    rank: 1 + sorted.filter(other => other.score > p.score).length
-                }))
-                session.status = 'finished'
-                io.to(roomCode).emit('session:finished', { leaderboard })
-                delete sessions[roomCode]
+                finishGame(roomCode, session)
                 return
             }
 
-            io.to(roomCode).emit('session:grading_question', gradingPayload(session))
+            emitGrading(roomCode, session)
         })
 
         on('host:set_timer', ({ roomCode, seconds }) => {
@@ -673,7 +685,7 @@ module.exports = function (io, db = pool, {
             socket.emit('session:players', { players: publicPlayers(session) })
 
             if (session.status === 'grading') {
-                io.to(roomCode).emit('session:grading_question', gradingPayload(session))
+                emitGrading(roomCode, session)
                 return
             }
 
