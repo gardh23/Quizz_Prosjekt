@@ -235,7 +235,7 @@ module.exports = function (io, db = pool, {
             let questionsResult
             try {
                 questionsResult = await db.query(
-                    'SELECT questions.*, json_agg(answers.*) as answers FROM questions LEFT JOIN answers ON answers.question_id = questions.id WHERE questions.quiz_id = $1 GROUP BY questions.id ORDER BY questions.order_index',
+                    'SELECT questions.*, json_agg(answers.* ORDER BY answers.id) as answers FROM questions LEFT JOIN answers ON answers.question_id = questions.id WHERE questions.quiz_id = $1 GROUP BY questions.id ORDER BY questions.order_index',
                     [session.quizId]
                 )
             } catch (err) {

@@ -49,7 +49,8 @@ router.get('/:id', requireAuth, async (req, res) => {
 
         for (const question of questionsResult.rows) {
             const answersResult = await pool.query(
-                'SELECT * FROM answers WHERE question_id = $1',
+                // Insertion order is the editor's order; ranking questions depend on it.
+                'SELECT * FROM answers WHERE question_id = $1 ORDER BY id',
                 [question.id]
             )
             question.answers = answersResult.rows
