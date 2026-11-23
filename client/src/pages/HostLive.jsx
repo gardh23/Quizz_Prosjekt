@@ -6,6 +6,7 @@ import { mediaBase } from '../api'
 import AnswerDistribution from '../components/AnswerDistribution'
 import Podium from '../components/Podium'
 import { sounds, startLobbyMusic, stopLobbyMusic } from '../sound'
+import Timer from '../components/Timer'
 
 function HostLive() {
     const { roomCode } = useParams()
@@ -313,12 +314,8 @@ function HostLive() {
                 {question && (
                     <div>
                         <div className="bg-white rounded-2xl p-6 mb-4 shadow-lg">
-                            <div className="flex items-center justify-between mb-3">
-                                <h2 className="text-2xl font-bold text-purple-900">{question.text}</h2>
-                                {timeLeft !== null && (
-                                    <span className={`text-3xl font-bold ${timeLeft <= 10 ? 'text-red-500' : 'text-purple-700'}`}>{timeLeft}</span>
-                                )}
-                            </div>
+                            <Timer timeLeft={timeLeft} total={question.time_limit} tone="light" />
+                            <h2 className="text-2xl font-bold text-purple-900 mt-4 mb-3 leading-tight text-balance">{question.text}</h2>
                             {question.image_path && (
                                 <img
                                     src={`${mediaBase}/${question.image_path}`}

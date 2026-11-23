@@ -1,3 +1,5 @@
+import { answerLetter } from '../answerLetter'
+
 // Bar colors follow the answer buttons' order (red, blue, yellow, green) so an option keeps
 // its identity. Yellow is a darker step than the button's so the bar holds up on the white card.
 const barColors = ['#ef4444', '#3b82f6', '#ca8a04', '#22c55e']
@@ -11,7 +13,8 @@ function AnswerDistribution({ distribution }) {
         <div className="flex flex-col gap-2 my-4" role="table" aria-label="Svarfordeling">
             {distribution.map((o, i) => (
                 <div key={o.id} role="row" className="flex items-center gap-3" title={`${o.count} av ${total} valgte «${o.text}»`}>
-                    <span role="cell" className="w-36 shrink-0 text-sm font-semibold text-gray-800 truncate">
+                    <span role="cell" className="w-44 shrink-0 text-sm font-semibold text-gray-800 truncate">
+                        <span className="inline-grid place-items-center w-6 h-6 mr-2 rounded-md bg-gray-100 text-gray-700 text-xs font-black">{answerLetter(i)}</span>
                         {o.isCorrect && <span className="text-green-700">✓ </span>}
                         {o.text}
                         {o.isCorrect && <span className="text-green-700 font-normal"> (riktig)</span>}

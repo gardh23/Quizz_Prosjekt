@@ -4,6 +4,8 @@ import { mediaBase } from '../api'
 import AnswerDistribution from '../components/AnswerDistribution'
 import Podium from '../components/Podium'
 import { sounds, startLobbyMusic, stopLobbyMusic } from '../sound'
+import Timer from '../components/Timer'
+import AnswerLetter from '../components/AnswerLetter'
 
 function Play() {
     const [answered, setAnswered] = useState(false)
@@ -324,11 +326,9 @@ function Play() {
         return (
             <div className="min-h-screen bg-purple-900 flex flex-col">
                 <div className="bg-purple-800 p-6 text-center">
-                    <div className="max-w-2xl mx-auto">
-                    {timeLeft !== null && (
-                        <p className={`text-4xl font-bold ${timeLeft <= 10 ? 'text-red-400' : 'text-white'}`}>{timeLeft}</p>
-                    )}
-                    <h1 className="text-3xl font-bold text-white mt-2">{question.text}</h1>
+                    <div className="max-w-3xl mx-auto">
+                    <Timer timeLeft={timeLeft} total={question.time_limit} />
+                    <h1 className="text-3xl md:text-4xl font-bold text-white mt-5 leading-tight text-balance">{question.text}</h1>
                     {/* Fixed height so the layout does not jump when the answer is registered. */}
                     <p className="min-h-7 mt-2 text-green-300 font-bold text-lg" aria-live="polite">
                         {answered && (question.type === 'free_text'
@@ -375,9 +375,9 @@ function Play() {
                     )}
                     </div>
                 </div>
-                <div className="flex-1 p-6">
+                <div className="flex-1 p-6 flex flex-col">
                     {(question.type === 'multiple_choice' || question.type === 'true_false') && (
-                        <div className="grid grid-cols-2 gap-4 h-full">
+                        <div className="grid grid-cols-2 auto-rows-fr gap-4 flex-1 max-h-[60vh] w-full max-w-5xl mx-auto">
                             {question.answers.map((answer, i) => {
                                 const selected = selectedAnswerId === answer.id
                                 const state = selected
@@ -396,9 +396,10 @@ function Play() {
                                         })
                                     }}
                                     disabled={answered || timeLeft === 0}
-                                    className={`${answerColors[i % 4]} relative font-bold text-xl rounded-2xl p-6 transition-all duration-300 disabled:cursor-default focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-yellow-300 ${state}`}
+                                    className={`${answerColors[i % 4]} relative min-h-32 flex items-center gap-4 px-6 text-left font-bold text-2xl md:text-3xl rounded-2xl transition-all duration-300 disabled:cursor-default focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-yellow-300 ${state}`}
                                 >
-                                    {answer.text}
+                                    <AnswerLetter index={i} />
+                                    <span className="break-words min-w-0">{answer.text}</span>
                                     {selected && (
                                         <span className="absolute top-2 right-3 bg-white text-purple-900 rounded-full w-8 h-8 grid place-items-center text-base" aria-label="Ditt svar">✓</span>
                                     )}
