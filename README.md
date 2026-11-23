@@ -147,7 +147,7 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 - **Rejoin-sikkerhet**: `player:rejoin` krever `connected === false` — kan ikke ta over plass til tilkoblet spiller. `player:join` med eksisterende frakoblet brukernavn behandles som rejoin; tilkoblet brukernavn gir "Brukernavnet er allerede tatt"
 - **questionStartedAt**: Settes på session ved spørsmålsstart, `null` under nedtelling — brukes til å beregne gjenstående tid ved rejoin
 - **speed_bonus per quiz**: Defineres i lobbyen av host, sendes med `host:start`, lagres i `session.speedBonus`
-- **Disconnect-håndtering**: Host-frakobling fryser quizen (fasen huskes i `statusBeforeFreeze`), spillere markeres `connected: false`. Merk: klienten kaller ikke `host:rejoin` ennå, så en host som refresher kan ikke ta opp igjen spillet
+- **Disconnect-håndtering**: Host-frakobling fryser quizen (fasen huskes i `statusBeforeFreeze`), spillere markeres `connected: false` og ser en pause-skjerm. HostLive sender `host:rejoin` ved oppstart og ved hver ny tilkobling, så en host som refresher eller mister nettet tar opp igjen spillet der det var. Svarfristen pauses mens spillet er fryst
 - **JSON.parse av answers**: FormData sender alt som strings — `parsedAnswers` håndterer dette i PUT og POST
 - **Socket.io autentisering**: JWT sendes via `socket.handshake.auth.token`, host-hendelser krever rolle `host`/`admin`
 - **Rate limiting**: Login og register er rate-limited per IP
