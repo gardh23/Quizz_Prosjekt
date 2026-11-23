@@ -489,6 +489,7 @@ module.exports = function (io, db = pool, {
                     session.host = null
                     session.statusBeforeFreeze = session.status
                     session.status = 'frozen'
+                    session.frozenAt = Date.now()
                     io.to(roomCode).emit('session:frozen', { message: 'Host koblet fra — venter på at host kobler til igjen' })
                 } else if (session.players[socket.id]) {
                     session.players[socket.id].connected = false
@@ -549,13 +550,20 @@ module.exports = function (io, db = pool, {
                 return
             }
 
-            if (session.host !== null) {
-                socket.emit('error', { message: 'En host er allerede tilkoblet' })
-                return
+            // On a page refresh the new connection can arrive before the server notices the
+            // old one is gone, so the same host account may replace a still-registered socket.
+            if (session.host !== null && session.host !== socket.id) {
+                io.sockets.sockets.get(session.host)?.leave(roomCode)
             }
 
+            if (session.status === 'frozen') {
+                session.status = session.statusBeforeFreeze
+                // Players should not lose answer time while the host was gone.
+                if (session.questionStartedAt) {
+                    session.questionDeadline += Date.now() - session.frozenAt
+                }
+            }
             session.host = socket.id
-            session.status = session.statusBeforeFreeze
 
             socket.join(roomCode)
             socket.emit('host:rejoined', { roomCode, status: session.status })
@@ -575,7 +583,12 @@ module.exports = function (io, db = pool, {
             const question = session.status === 'active' && session.questionStartedAt
                 ? session.questions[session.currentQuestion]
                 : null
-            emitQuestion(io, roomCode, session, 'session:resumed', { question, index: session.currentQuestion, total: session.questions?.length ?? 0 })
+            emitQuestion(io, roomCode, session, 'session:resumed', {
+                question,
+                index: session.currentQuestion,
+                total: session.questions?.length ?? 0,
+                timeRemaining: question ? secondsRemaining(session) : null
+            })
         })
 
 

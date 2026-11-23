@@ -51,6 +51,38 @@ test('a host who drops in the lobby comes back to an open lobby', async () => {
     await joinPlayers(server, roomCode, ['bob'])
 })
 
+test('a refreshing host can take over before the old connection is gone', async () => {
+    const { host, players: [ada], roomCode } = await startGame(server, ['ada'])
+    const back = server.client(HOST)
+    const resumed = once(ada, 'session:resumed')
+    back.emit('host:rejoin', { roomCode })
+    await once(back, 'host:rejoined')
+    await resumed
+
+    host.disconnect()
+    assert.ok(await never(ada, 'session:frozen'))
+    const next = once(ada, 'session:question')
+    back.emit('host:next', { roomCode })
+    assert.equal((await next).question.id, 2)
+})
+
+test('the question timer is paused while the game is frozen', async () => {
+    const { host, players: [ada], roomCode } = await startGame(server, ['ada'])
+    host.emit('host:set_timer', { roomCode, seconds: 1 })
+    await once(ada, 'session:timer_override')
+    await dropHost(host, ada)
+    await new Promise(r => setTimeout(r, 1300))
+
+    const back = server.client(HOST)
+    const resumed = once(ada, 'session:resumed')
+    back.emit('host:rejoin', { roomCode })
+    const { timeRemaining } = await resumed
+    assert.ok(timeRemaining >= 0 && timeRemaining <= 1, `timeRemaining ${timeRemaining}`)
+
+    ada.emit('player:answer', { roomCode, answerId: 11 })
+    await once(ada, 'player:answer_result')
+})
+
 test('a host who drops during grading comes back to grading', async () => {
     const { host, players: [ada], roomCode } = await startGame(server, ['ada'])
     host.emit('host:next', { roomCode })
