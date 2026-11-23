@@ -25,6 +25,7 @@ function Play() {
     const [audioPlaying, setAudioPlaying] = useState(false)
     const [timeLeft, setTimeLeft] = useState(null)
     const timerRef = useRef(null)
+    const [frozen, setFrozen] = useState(false)
 
     // Rettefase
     const [gradingQuestion, setGradingQuestion] = useState(null)
@@ -106,6 +107,12 @@ function Play() {
             startTimer(question.time_limit)
         })
         socket.on('session:timer_override', ({ seconds }) => startTimer(seconds))
+        socket.on('session:frozen', () => setFrozen(true))
+        socket.on('session:resumed', ({ question: resumed, timeRemaining }) => {
+            setFrozen(false)
+            // The server paused the deadline while frozen; resync the local countdown.
+            if (resumed) startTimer(timeRemaining)
+        })
         socket.on('player:answer_result', () => {
             setAnswered(true)
             setConfirmFlash(true)
@@ -156,6 +163,8 @@ function Play() {
             socket.off('session:players')
             socket.off('session:question')
             socket.off('session:timer_override')
+            socket.off('session:frozen')
+            socket.off('session:resumed')
             socket.off('player:answer_result')
             socket.off('session:countdown')
             socket.off('session:grading_question')
@@ -191,6 +200,17 @@ function Play() {
                             </div>
                         ))}
                     </div>
+                </div>
+            </div>
+        )
+    }
+
+    if (joined && frozen && !finished) {
+        return (
+            <div className="min-h-screen bg-purple-900 flex items-center justify-center">
+                <div className="bg-white rounded-2xl p-10 text-center shadow-2xl w-full max-w-md">
+                    <h1 className="text-3xl font-bold text-purple-900 mb-2">Pause</h1>
+                    <p className="text-gray-500">Hosten mistet forbindelsen — quizen fortsetter når hosten er tilbake.</p>
                 </div>
             </div>
         )

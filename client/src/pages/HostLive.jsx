@@ -16,6 +16,8 @@ function HostLive() {
     const [speedBonus, setSpeedBonus] = useState(false)
     const [timeLeft, setTimeLeft] = useState(null)
     const [countdownLeft, setCountdownLeft] = useState(null)
+    const [phase, setPhase] = useState('waiting')
+    const [error, setError] = useState('')
     const timerRef = useRef(null)
     const countdownRef = useRef(null)
 
@@ -38,8 +40,27 @@ function HostLive() {
     }
 
     useEffect(() => {
+        // After a refresh or a dropped connection the server has frozen the game;
+        // rejoining hands it to this socket. On a fresh room it is a harmless no-op.
+        const rejoin = () => socket.emit('host:rejoin', { roomCode })
+        socket.on('connect', rejoin)
+        if (socket.connected) rejoin()
+
+        socket.on('host:rejoined', ({ status }) => setPhase(status))
+        socket.on('session:resumed', ({ question, timeRemaining }) => {
+            if (!question) return
+            setQuestion(question)
+            setCountdownLeft(null)
+            startTimer(timeRemaining)
+        })
+        socket.on('error', ({ message }) => {
+            if (message === 'Romkode ikke funnet') navigate('/host')
+            else setError(message)
+        })
         socket.on('session:players', ({ players }) => setPlayers(players))
         socket.on('session:question', ({ question }) => {
+            setPhase('active')
+            setError('')
             setQuestion(question)
             setFreeTextAnswers({})
             setCountdownLeft(null)
@@ -58,6 +79,7 @@ function HostLive() {
             }, 1000)
         })
         socket.on('session:grading_question', ({ question, playerAnswers, gradingIndex, total }) => {
+            setPhase('grading')
             setGradingQuestion(question)
             setGradingPlayerAnswers(playerAnswers)
             setGradingIndex(gradingIndex)
@@ -79,6 +101,10 @@ function HostLive() {
         })
 
         return () => {
+            socket.off('connect', rejoin)
+            socket.off('host:rejoined')
+            socket.off('session:resumed')
+            socket.off('error')
             socket.off('session:players')
             socket.off('session:question')
             socket.off('session:countdown')
@@ -89,7 +115,7 @@ function HostLive() {
             if (timerRef.current) clearInterval(timerRef.current)
             if (countdownRef.current) clearInterval(countdownRef.current)
         }
-    }, [])
+    }, [roomCode, navigate])
 
     const next = () => {
         socket.emit('host:next', { roomCode })
@@ -231,7 +257,9 @@ function HostLive() {
                     <span className="bg-purple-700 text-purple-200 px-4 py-2 rounded-xl">{players.length} spillere</span>
                 </div>
 
-                {!question && countdownLeft === null && (
+                {error && <p className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-center">{error}</p>}
+
+                {phase === 'waiting' && !question && countdownLeft === null && (
                     <div>
                         <button
                             onClick={() => navigate('/host')}
