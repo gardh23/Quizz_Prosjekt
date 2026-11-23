@@ -59,13 +59,30 @@ function emitQuestion(io, roomCode, session, event, payload) {
     }
 }
 
+// The server is the only clock that counts: a client can claim any timeUsed it likes.
+function openQuestion(session) {
+    const question = session.questions[session.currentQuestion]
+    session.questionStartedAt = Date.now()
+    session.questionDeadline = session.questionStartedAt + question.time_limit * 1000
+}
+
+function secondsRemaining(session) {
+    return Math.max(0, Math.round((session.questionDeadline - Date.now()) / 1000))
+}
+
+function speedPoints(timeUsed, allowedMs) {
+    if (allowedMs <= 0) return 0
+    return Math.max(0, Math.min(1000, Math.round(1000 * (1 - timeUsed / allowedMs))))
+}
+
 function generateRoomCode() {
     const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
     const noun = nouns[Math.floor(Math.random() * nouns.length)]
     return `${adj}-${noun}`
 }
 
-module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
+// answerGraceMs absorbs network latency for answers sent just as the timer hits 0.
+module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs = 1000 } = {}) {
     const sessions = {}
 
     io.on('connection', (socket) => {
@@ -127,9 +144,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
                 const currentQuestion = session.questionStartedAt
                     ? session.questions[session.currentQuestion]
                     : null
-                const timeRemaining = currentQuestion
-                    ? Math.max(0, Math.round(currentQuestion.time_limit - (Date.now() - session.questionStartedAt) / 1000))
-                    : null
+                const timeRemaining = currentQuestion ? secondsRemaining(session) : null
                 socket.emit('player:rejoined', { score: playerData.score, status: session.status, question: questionForPlayers(currentQuestion), timeRemaining })
                 io.to(roomCode).emit('session:players', { players: publicPlayers(session) })
                 return
@@ -178,13 +193,13 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
             session.speedBonus = speedBonus || false
             session.status = 'active'
             session.currentQuestion = 0
-            session.questionStartedAt = Date.now()
+            openQuestion(session)
 
             const question = session.questions[session.currentQuestion]
             emitQuestion(io, roomCode, session, 'session:question', { question, index: 0, total: session.questions.length })
         })
 
-        socket.on('player:answer', ({ roomCode, answerId, timeUsed, freeTextResponse }) => {
+        socket.on('player:answer', ({ roomCode, answerId, freeTextResponse }) => {
             const session = sessions[roomCode]
 
             if (!session || session.status !== 'active') {
@@ -198,26 +213,42 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
                 return
             }
 
+            if (!session.questionStartedAt) {
+                socket.emit('error', { message: 'Spørsmålet er ikke åpent ennå' })
+                return
+            }
+
+            const now = Date.now()
+            if (now > session.questionDeadline + answerGraceMs) {
+                socket.emit('error', { message: 'Tiden er ute' })
+                return
+            }
+
             const question = session.questions[session.currentQuestion]
             if (player.answers[question.id] && question.type !== 'free_text') {
                 socket.emit('error', { message: 'Du har allerede svart' })
                 return
             }
 
-            const answer = question.answers.find(a => a.id === answerId)
+            const answer = (question.answers || []).find(a => a && a.id === answerId)
+            if (question.type !== 'free_text' && !answer) {
+                socket.emit('error', { message: 'Ugyldig svar' })
+                return
+            }
+
             const isCorrect = question.type === 'free_text' ? false : (answer?.is_correct || false)
             const safeResponse = question.type === 'free_text' && typeof freeTextResponse === 'string'
                 ? freeTextResponse.slice(0, 100)
                 : ''
 
+            const timeUsed = now - session.questionStartedAt
+            const allowedMs = session.questionDeadline - session.questionStartedAt
             let points = 0
             if (isCorrect) {
-                points = session.speedBonus
-                    ? Math.round(1000 * (1 - timeUsed / (question.time_limit * 1000)))
-                    : 1
+                points = session.speedBonus ? speedPoints(timeUsed, allowedMs) : 1
             }
 
-            player.answers[question.id] = { answerId, isCorrect, points, timeUsed, freeTextResponse: safeResponse, graded: false }
+            player.answers[question.id] = { answerId, isCorrect, points, timeUsed, allowedMs, freeTextResponse: safeResponse, graded: false }
             player.score += points
             socket.emit('player:answer_result', {})
             if (question.type === 'free_text') {
@@ -266,7 +297,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
 
             const question = session.questions[session.currentQuestion]
             setTimeout(() => {
-                session.questionStartedAt = Date.now()
+                openQuestion(session)
                 emitQuestion(io, roomCode, session, 'session:question', { question, index: session.currentQuestion, total: session.questions.length })
             }, countdownSeconds * 1000)
         })
@@ -315,6 +346,14 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
                 return
             }
 
+            if (!Number.isFinite(seconds) || seconds < 0 || seconds > 3600) {
+                socket.emit('error', { message: 'Ugyldig antall sekunder' })
+                return
+            }
+            if (session.questionStartedAt) {
+                session.questionDeadline = Date.now() + seconds * 1000
+            }
+
             io.to(roomCode).emit('session:timer_override', { seconds })
         })
 
@@ -337,7 +376,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
             const question = session.questions[questionIndex]
             const points = isCorrect
                 ? session.speedBonus
-                    ? Math.round(1000 * (1 - player.answers[question.id].timeUsed / (question.time_limit * 1000)))
+                    ? speedPoints(player.answers[question.id].timeUsed, player.answers[question.id].allowedMs)
                     : 1
                 : 0
 
@@ -396,9 +435,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
             const currentQuestion = session.questionStartedAt
                 ? session.questions[session.currentQuestion]
                 : null
-            const timeRemaining = currentQuestion
-                ? Math.max(0, Math.round(currentQuestion.time_limit - (Date.now() - session.questionStartedAt) / 1000))
-                : null
+            const timeRemaining = currentQuestion ? secondsRemaining(session) : null
 
             socket.emit('player:rejoined', {
                 score: session.players[socket.id].score,
