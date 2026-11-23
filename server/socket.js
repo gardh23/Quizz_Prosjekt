@@ -23,10 +23,31 @@ function isChoice(type) {
     return type === 'multiple_choice' || type === 'true_false'
 }
 
+// Accepts "8 849" or "8849,5" as a Norwegian host might type it.
+function parseNumber(text) {
+    return Number(String(text ?? '').replace(/\s/g, '').replace(',', '.'))
+}
+
+// 1 for an exact guess, falling linearly to 0 at 50% off.
+function estimatePrecision(guess, correct) {
+    if (!Number.isFinite(correct)) return 0
+    if (correct === 0) return guess === 0 ? 1 : 0
+    return Math.max(0, 1 - Math.abs(guess - correct) / Math.abs(correct) / 0.5)
+}
+
+// Without speed bonus every question is worth 1 point, so partial credit rounds:
+// at least halfway earns the point. With speed bonus it scales to 0-1000, with no time factor.
+function precisionPoints(precision, speedBonus) {
+    return speedBonus ? Math.round(1000 * precision) : (precision >= 0.5 ? 1 : 0)
+}
+
 function buildPlayerAnswers(session, question) {
     return Object.entries(session.players).map(([socketId, player]) => {
         const ans = player.answers[question.id]
         if (!ans) return { username: player.username, socketId, answered: false }
+        if (question.type === 'number_estimate') {
+            return { username: player.username, socketId, answered: true, answerText: String(ans.numberResponse), isCorrect: ans.isCorrect, points: ans.points }
+        }
         if (isChoice(question.type)) {
             const answerObj = (question.answers || []).find(a => a.id === ans.answerId)
             return { username: player.username, socketId, answered: true, answerText: answerObj ? answerObj.text : '?', isCorrect: ans.isCorrect, points: ans.points }
@@ -39,7 +60,7 @@ function buildPlayerAnswers(session, question) {
 // Players must never see is_correct or the free-text key before the grading phase.
 function questionForPlayers(question) {
     if (!question) return question
-    const answers = question.type === 'free_text'
+    const answers = question.type === 'free_text' || question.type === 'number_estimate'
         ? []
         : (question.answers || []).filter(Boolean).map(({ id, text }) => ({ id, text }))
     return { ...question, answers }
@@ -264,7 +285,7 @@ module.exports = function (io, db = pool, {
             emitQuestion(io, roomCode, session, 'session:question', { question, index: 0, total: session.questions.length })
         })
 
-        on('player:answer', ({ roomCode, answerId, freeTextResponse }) => {
+        on('player:answer', ({ roomCode, answerId, freeTextResponse, numberResponse }) => {
             const session = sessions[roomCode]
 
             if (!session || session.status !== 'active') {
@@ -295,26 +316,36 @@ module.exports = function (io, db = pool, {
                 return
             }
 
-            const answer = (question.answers || []).find(a => a && a.id === answerId)
-            if (question.type !== 'free_text' && !answer) {
-                socket.emit('error', { message: 'Ugyldig svar' })
-                return
-            }
-
-            const isCorrect = question.type === 'free_text' ? false : (answer?.is_correct || false)
-            const safeResponse = question.type === 'free_text' && typeof freeTextResponse === 'string'
-                ? freeTextResponse.slice(0, 100)
-                : ''
-
             const timeUsed = now - session.questionStartedAt
             const allowedMs = session.questionDeadline - session.questionStartedAt
-            let points = 0
-            if (isCorrect) {
-                points = session.speedBonus ? speedPoints(timeUsed, allowedMs) : 1
+            const record = { isCorrect: false, points: 0, timeUsed, allowedMs, freeTextResponse: '', graded: false }
+
+            if (question.type === 'free_text') {
+                record.freeTextResponse = typeof freeTextResponse === 'string' ? freeTextResponse.slice(0, 100) : ''
+            } else if (question.type === 'number_estimate') {
+                if (typeof numberResponse !== 'number' || !Number.isFinite(numberResponse)) {
+                    socket.emit('error', { message: 'Ugyldig tall' })
+                    return
+                }
+                const precision = estimatePrecision(numberResponse, parseNumber(question.answers?.[0]?.text))
+                record.numberResponse = numberResponse
+                record.isCorrect = precision >= 0.5
+                record.points = precisionPoints(precision, session.speedBonus)
+            } else {
+                const answer = (question.answers || []).find(a => a && a.id === answerId)
+                if (!answer) {
+                    socket.emit('error', { message: 'Ugyldig svar' })
+                    return
+                }
+                record.answerId = answerId
+                record.isCorrect = !!answer.is_correct
+                if (record.isCorrect) {
+                    record.points = session.speedBonus ? speedPoints(timeUsed, allowedMs) : 1
+                }
             }
 
-            player.answers[question.id] = { answerId, isCorrect, points, timeUsed, allowedMs, freeTextResponse: safeResponse, graded: false }
-            player.score += points
+            player.answers[question.id] = record
+            player.score += record.points
             socket.emit('player:answer_result', {})
             if (question.type === 'free_text') {
                 const hostSocket = io.sockets.sockets.get(session.host)
@@ -322,7 +353,7 @@ module.exports = function (io, db = pool, {
                     hostSocket.emit('host:free_text_answer', {
                         playerId: socket.id,
                         username: player.username,
-                        answer: safeResponse,
+                        answer: record.freeTextResponse,
                         questionId: question.id
                     })
                 }

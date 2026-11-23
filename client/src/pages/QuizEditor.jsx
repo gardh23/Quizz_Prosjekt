@@ -12,6 +12,7 @@ const emptyAnswers = [
 
 const defaultAnswers = (type) => {
     if (type === 'true_false') return [{ text: 'Sant', is_correct: true }, { text: 'Usant', is_correct: false }]
+    if (type === 'number_estimate') return [{ text: '', is_correct: true }]
     return emptyAnswers
 }
 
@@ -183,6 +184,7 @@ function QuizEditor() {
                             <option value="multiple_choice">Flervalg</option>
                             <option value="free_text">Fritekst</option>
                             <option value="true_false">Sant/usant</option>
+                            <option value="number_estimate">Tallestimat</option>
                         </select>
 
                         <input
@@ -289,6 +291,20 @@ function QuizEditor() {
                                         <span className="text-gray-700 text-lg">{answer.text}</span>
                                     </label>
                                 ))}
+                            </div>
+                        )}
+
+                        {type === 'number_estimate' && (
+                            <div className="flex flex-col gap-1">
+                                <input
+                                    type="number"
+                                    step="any"
+                                    value={answers[0]?.text || ''}
+                                    onChange={e => setAnswers([{ text: e.target.value, is_correct: true }])}
+                                    placeholder="Riktig tall"
+                                    className="border-2 border-gray-200 rounded-xl p-3 text-lg focus:outline-none focus:border-purple-500"
+                                />
+                                <p className="text-sm text-gray-500">Poeng etter hvor nær spillerne er. Uten hastighetsbonus gir høyst 25 % feil 1 poeng.</p>
                             </div>
                         )}
 

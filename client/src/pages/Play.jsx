@@ -20,6 +20,7 @@ function Play() {
     const [players, setPlayers] = useState([])
     const [questionStartTime, setQuestionStartTime] = useState(null)
     const [freeTextInput, setFreeTextInput] = useState('')
+    const [numberInput, setNumberInput] = useState('')
     const [question, setQuestion] = useState(null)
     const audioRef = useRef(null)
     const [audioPlaying, setAudioPlaying] = useState(false)
@@ -97,6 +98,7 @@ function Play() {
             setConfirmFlash(false)
             setSelectedAnswerId(null)
             setFreeTextInput('')
+            setNumberInput('')
             setAudioPlaying(false)
             setCountdownLeft(null)
             if (countdownRef.current) clearInterval(countdownRef.current)
@@ -271,7 +273,7 @@ function Play() {
                                     </div>
                                     {a.answered && (gradingQuestion.type !== 'free_text' || a.graded) && (
                                         <span className={`font-bold px-3 py-1 rounded-lg text-sm ${a.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                            {a.isCorrect ? `✓ ${a.points}p` : '✗'}
+                                            {a.isCorrect ? `✓ ${a.points}p` : a.points > 0 ? `${a.points}p` : '✗'}
                                         </span>
                                     )}
                                 </div>
@@ -355,6 +357,32 @@ function Play() {
                                 </button>
                             ))}
                         </div>
+                    )}
+                    {question.type === 'number_estimate' && (
+                        <form onSubmit={e => {
+                            e.preventDefault()
+                            const value = Number(numberInput.replace(/\s/g, '').replace(',', '.'))
+                            if (!numberInput.trim() || !Number.isFinite(value)) return
+                            socket.emit('player:answer', { roomCode, numberResponse: value })
+                        }} className="flex flex-col gap-4 max-w-lg mx-auto mt-8">
+                            <input
+                                value={numberInput}
+                                onChange={e => setNumberInput(e.target.value)}
+                                inputMode="decimal"
+                                placeholder="Ditt tall"
+                                disabled={answered || timeLeft === 0}
+                                className="border-2 border-purple-300 rounded-xl p-4 text-xl text-center focus:outline-none focus:border-purple-500
+  disabled:opacity-50"
+                            />
+                            <button
+                                type="submit"
+                                disabled={answered || timeLeft === 0}
+                                className="bg-green-500 hover:bg-green-600 text-white font-bold text-xl py-4 rounded-xl transition-colors
+  disabled:opacity-50"
+                            >
+                                Send svar
+                            </button>
+                        </form>
                     )}
                     {question.type === 'free_text' && (
                         <form onSubmit={e => {

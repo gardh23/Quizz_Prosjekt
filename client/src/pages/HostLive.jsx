@@ -208,7 +208,7 @@ function HostLive() {
                                             {!a.answered ? null
                                             : gradingQuestion.type !== 'free_text' ? (
                                                 <span className={`font-bold px-3 py-1 rounded-lg text-sm ${a.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                    {a.isCorrect ? `✓ ${a.points}p` : '✗'}
+                                                    {a.isCorrect ? `✓ ${a.points}p` : a.points > 0 ? `${a.points}p` : '✗'}
                                                 </span>
                                             ) : grade ? (
                                                 <span className={`font-bold px-3 py-1 rounded-lg text-sm ${grade.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
