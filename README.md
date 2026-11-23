@@ -138,6 +138,10 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 - **Serveren eier klokka**: `openQuestion` setter `questionStartedAt` og `questionDeadline`. Svar etter fristen (+1 sek slingringsmonn for nettverk) og under nedtelling avvises. Hastighetspoeng beregnes fra serverens tid og begrenses til 0–1000
 - **Krasjsikre hendelser**: Alle socket-hendelser går via `on()`-innpakningen i `socket.js`, som tåler manglende payload og gjør feil om til en `error`-hendelse i stedet for å krasje prosessen (som ville slettet alle pågående spill)
 - **Opprydding**: Hver hendelse oppdaterer rommets `lastActivity`; rom som har vært inaktive i 2 timer slettes
+- **Svarfordeling**: `session:grading_question` har `distribution` (antall per alternativ + `isCorrect`) for flervalg og sant/usant, ellers `null`. Vises som stolper i svarknappenes farger (`components/AnswerDistribution.jsx`)
+- **Leaderboard ved uavgjort**: lik poengsum gir delt plass, neste plass hoppes over (1, 1, 3)
+- **Pall**: `components/Podium.jsx` avslører 3. → 2. → 1. plass, med konfetti (`canvas-confetti`) og fanfare. Respekterer `prefers-reduced-motion`
+- **Lyd**: `src/sound.js` syntetiserer alt med Web Audio (ingen lydfiler). Toner hoppes over til nettleseren har låst opp lyd (første klikk). Mute-valget lagres i `localStorage` (`quizz_muted`)
 - **freeTextResponse**: Spillers tekst sendes separat fra `answerId` (fasit-IDen); kan sendes inn på nytt så lenge timer ikke er ute
 - **Fritekst-poeng**: Settes til 0 ved innsending — host vurderer med `host:grade` i rettefasen
 - **Rettefase**: Etter siste spørsmål går quizen inn i `status: 'grading'`. Host blar gjennom alle spørsmål med `host:grading_next`. Flervalg rettes automatisk, fritekst manuelt. Alle spillere ser alle svar og rettingen live via `session:grading_question` og `session:answer_graded`. Leaderboard vises kun etter rettefasen.
@@ -270,4 +274,4 @@ Testene i `server/test/` starter en ekte Socket.io-server med en falsk database 
 
 ## Neste steg
 
-Prosjektet er i produksjon på https://gardh23.eu/quiz/. Forbedringsrunde 2: fase 1 (sikkerhet og bugs) og fase 2 (sant/usant, tallestimat, rangering) er gjort; neste er lyd/pall/svarfordeling, deretter designoppussing.
+Prosjektet er i produksjon på https://gardh23.eu/quiz/. Forbedringsrunde 2: fase 1 (sikkerhet og bugs), fase 2 (sant/usant, tallestimat, rangering) og fase 3 (svarfordeling i rettefasen, pall med konfetti, lyd) er gjort; neste er designoppussing.
