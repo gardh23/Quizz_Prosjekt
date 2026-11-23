@@ -489,7 +489,8 @@ module.exports = function (io, db = pool, {
 
             const question = session.questions[session.currentQuestion]
             setTimeout(() => {
-                if (sessions[roomCode] !== session) return
+                // The host may have ended the quiz during the countdown.
+                if (sessions[roomCode] !== session || session.status !== 'active') return
                 openQuestion(session)
                 emitQuestion(io, roomCode, session, 'session:question', { question, index: session.currentQuestion, total: session.questions.length })
             }, countdownSeconds * 1000)
@@ -519,6 +520,34 @@ module.exports = function (io, db = pool, {
             }
 
             emitGrading(roomCode, session)
+        })
+
+        // Mid-quiz: skip the remaining questions and grade the ones asked. During grading: finish.
+        on('host:end', ({ roomCode }) => {
+            if (!socket.user || (socket.user.role !== 'host' && socket.user.role !== 'admin')) {
+                socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
+            const session = sessions[roomCode]
+            if (!session || session.host !== socket.id) {
+                socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
+
+            if (session.status === 'grading') {
+                finishGame(roomCode, session)
+                return
+            }
+            if (session.status !== 'active') {
+                socket.emit('error', { message: 'Quizen er ikke i gang' })
+                return
+            }
+
+            // During the countdown currentQuestion already points at a question nobody has seen.
+            const asked = session.questionStartedAt ? session.currentQuestion + 1 : session.currentQuestion
+            session.questions = session.questions.slice(0, asked)
+            session.questionStartedAt = null
+            startGrading(roomCode, session)
         })
 
         on('host:set_timer', ({ roomCode, seconds }) => {
