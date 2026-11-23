@@ -22,6 +22,7 @@ function HostLive() {
     const [countdownLeft, setCountdownLeft] = useState(null)
     const [phase, setPhase] = useState('waiting')
     const [error, setError] = useState('')
+    const [copied, setCopied] = useState(false)
     const timerRef = useRef(null)
     const countdownRef = useRef(null)
 
@@ -133,6 +134,21 @@ function HostLive() {
     useEffect(() => {
         if (countdownLeft > 0) sounds.tick()
     }, [countdownLeft])
+
+    const answeredCount = question ? players.filter(p => p.answers?.[question.id]).length : 0
+    const allAnswered = players.length > 0 && answeredCount === players.length
+
+    // A ready-to-paste message for the video call; the link pre-fills the room code.
+    const copyInvite = async () => {
+        const link = `${window.location.origin}/quiz/play?rom=${encodeURIComponent(roomCode)}`
+        try {
+            await navigator.clipboard.writeText(`Bli med i quizen: ${link} (romkode ${roomCode})`)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+        } catch {
+            setError('Kunne ikke kopiere — del romkoden manuelt')
+        }
+    }
 
     const questionOpen = !!question
     useEffect(() => {
@@ -277,33 +293,60 @@ function HostLive() {
     return (
         <div className="min-h-screen bg-purple-900 p-8">
             {/* Leaving is only offered in the lobby; mid-game it would strand the players. */}
-            <TopBar onBack={phase === 'waiting' && !question && countdownLeft === null ? () => navigate('/host') : undefined} />
+            <TopBar onBack={inLobby ? () => navigate('/host') : undefined} />
             <div className="max-w-2xl mx-auto">
-                <div className="flex items-center justify-between mb-6">
-                    <h1 className="text-3xl font-bold text-white">Romkode: <span className="text-yellow-300">{roomCode}</span></h1>
-                    <span className="bg-purple-700 text-purple-200 px-4 py-2 rounded-xl">{players.length} spillere</span>
-                </div>
+                {!inLobby && (
+                    <div className="flex items-center justify-between mb-6">
+                        <h1 className="text-2xl font-bold text-white">Rom <span className="text-yellow-300">{roomCode}</span></h1>
+                        <span className="bg-purple-700 text-purple-100 px-4 py-2 rounded-xl">{players.length} spillere</span>
+                    </div>
+                )}
 
-                {error && <p className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-center">{error}</p>}
+                {error && <p role="alert" className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-center">{error}</p>}
 
-                {phase === 'waiting' && !question && countdownLeft === null && (
+                {inLobby && (
                     <div>
-                        <div className="flex flex-wrap gap-2 mb-6">
-                            {players.map((p, i) => (
-                                <span key={i} className="bg-white text-purple-900 font-semibold px-4 py-2 rounded-full">{p.username}</span>
-                            ))}
+                        <div className="bg-white rounded-3xl p-8 text-center shadow-2xl mb-8">
+                            <p className="text-gray-500 uppercase tracking-widest text-sm font-semibold">Bli med på</p>
+                            <p className="text-xl font-semibold text-purple-900 mt-1">{window.location.host}/quiz/play</p>
+                            <p className="text-gray-500 uppercase tracking-widest text-sm font-semibold mt-6">med romkoden</p>
+                            <p className="text-5xl md:text-7xl font-black tracking-wider text-purple-900 font-mono mt-1 break-all">{roomCode}</p>
+                            <button onClick={copyInvite} className="btn btn-soft mt-6">
+                                {copied ? '✓ Kopiert' : 'Kopier invitasjon'}
+                            </button>
                         </div>
-                        <label className="flex items-center gap-3 cursor-pointer text-white mb-4">
+
+                        <div className="flex items-center justify-between mb-3">
+                            <h2 className="text-xl font-bold text-white">Spillere</h2>
+                            <span className="text-purple-200 font-semibold tabular-nums">{players.length}</span>
+                        </div>
+                        {players.length === 0 ? (
+                            <p className="text-purple-200 text-center py-8 border-2 border-dashed border-purple-500 rounded-2xl mb-6">
+                                Venter på spillere …
+                            </p>
+                        ) : (
+                            <div className="flex flex-wrap gap-2 mb-6">
+                                {players.map(p => (
+                                    <span key={p.username} className="bg-white text-purple-900 font-semibold px-4 py-2 rounded-full">{p.username}</span>
+                                ))}
+                            </div>
+                        )}
+
+                        <label className="flex items-start gap-3 cursor-pointer text-white mb-6">
                             <input
                                 type="checkbox"
                                 checked={speedBonus}
                                 onChange={e => setSpeedBonus(e.target.checked)}
-                                className="w-5 h-5 accent-purple-400"
+                                className="w-5 h-5 mt-1 accent-purple-400"
                             />
-                            <span className="text-lg font-semibold">Hastighetsbonus</span>
+                            <span>
+                                <span className="block text-lg font-semibold">Hastighetsbonus</span>
+                                <span className="block text-sm text-purple-200">Raskere svar gir flere poeng (opptil 1000 per spørsmål)</span>
+                            </span>
                         </label>
                         <button
                             onClick={() => socket.emit('host:start', { roomCode, speedBonus })}
+                            disabled={players.length === 0}
                             className="btn btn-go btn-lg text-2xl py-5"
                         >
                             Start quiz
@@ -313,7 +356,7 @@ function HostLive() {
 
                 {question && (
                     <div>
-                        <div className="bg-white rounded-2xl p-6 mb-4 shadow-lg">
+                        <div className={`bg-white rounded-2xl p-6 mb-4 shadow-lg transition-shadow ${allAnswered ? 'ring-4 ring-green-400' : ''}`}>
                             <Timer timeLeft={timeLeft} total={question.time_limit} tone="light" />
                             <h2 className="text-2xl font-bold text-purple-900 mt-4 mb-3 leading-tight text-balance">{question.text}</h2>
                             {question.image_path && (
@@ -326,9 +369,19 @@ function HostLive() {
                             {question.audio_path && (
                                 <audio controls src={`${mediaBase}/${question.audio_path}`} className="w-full mb-3 mt-3" />
                             )}
-                            <p className="text-gray-500 text-sm mb-2">
-                                {players.filter(p => p.answers && p.answers[question.id]).length} / {players.length} har svart
-                            </p>
+                            <div className="flex items-end justify-between mt-2 mb-2">
+                                <p>
+                                    <span className="text-4xl font-black text-purple-900 tabular-nums">{answeredCount}</span>
+                                    <span className="text-gray-500"> av {players.length} har svart</span>
+                                </p>
+                                {allAnswered && <span className="text-green-700 font-bold">✓ Alle har svart!</span>}
+                            </div>
+                            <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-3">
+                                <div
+                                    className="h-full bg-green-500 transition-[width] duration-500"
+                                    style={{ width: `${players.length ? (answeredCount / players.length) * 100 : 0}%` }}
+                                />
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 {players.map((p, i) => (
                                     <span key={i} className={`px-3 py-1 rounded-full text-sm font-semibold ${p.answers && p.answers[question.id] ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
@@ -358,28 +411,27 @@ function HostLive() {
                             </div>
                         )}
 
-                        <form onSubmit={overrideTimer} className="flex gap-3 mb-4">
-                            <input
-                                value={timer}
-                                onChange={e => setTimer(e.target.value)}
-                                placeholder="Overstyr timer (sekunder)"
-                                type="number"
-                                className="flex-1 border-2 border-purple-300 rounded-xl p-3 bg-purple-800 text-white placeholder-purple-300 focus:outline-none focus:border-white"
-                            />
-                            <button
-                                type="submit"
-                                className="btn btn-soft"
-                            >
-                                Sett timer
-                            </button>
-                        </form>
-
                         <button
                             onClick={next}
                             className="btn btn-next btn-lg"
                         >
                             Neste spørsmål
                         </button>
+
+                        <details className="mt-4 text-purple-200">
+                            <summary className="cursor-pointer text-sm font-semibold w-fit">Juster tid</summary>
+                            <form onSubmit={overrideTimer} className="flex gap-3 mt-3">
+                                <input
+                                    value={timer}
+                                    onChange={e => setTimer(e.target.value)}
+                                    placeholder="Sekunder igjen"
+                                    type="number"
+                                    min="0"
+                                    className="field flex-1 text-base"
+                                />
+                                <button type="submit" className="btn btn-soft">Sett tid</button>
+                            </form>
+                        </details>
                     </div>
                 )}
 

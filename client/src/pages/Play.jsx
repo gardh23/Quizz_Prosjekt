@@ -16,7 +16,8 @@ function Play() {
     const [myResult, setMyResult] = useState(null)
     const [countdownLeft, setCountdownLeft] = useState(null)
     const countdownRef = useRef(null)
-    const [roomCode, setRoomCode] = useState('')
+    // The host's invite link carries ?rom=CODE so players only have to type their name.
+    const [roomCode, setRoomCode] = useState(() => new URLSearchParams(window.location.search).get('rom') || '')
     const [username, setUsername] = useState('')
     const usernameRef = useRef('')
     const [joined, setJoined] = useState(false)
