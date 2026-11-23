@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import socket from '../socket'
 import UserBadge from '../components/UserBadge'
 import { mediaBase } from '../api'
+import AnswerDistribution from '../components/AnswerDistribution'
 
 function HostLive() {
     const { roomCode } = useParams()
@@ -24,6 +25,7 @@ function HostLive() {
     // Rettefase
     const [gradingQuestion, setGradingQuestion] = useState(null)
     const [gradingPlayerAnswers, setGradingPlayerAnswers] = useState([])
+    const [gradingDistribution, setGradingDistribution] = useState(null)
     const [gradingIndex, setGradingIndex] = useState(0)
     const [gradingTotal, setGradingTotal] = useState(0)
     const [localGrades, setLocalGrades] = useState({})
@@ -78,7 +80,8 @@ function HostLive() {
                 })
             }, 1000)
         })
-        socket.on('session:grading_question', ({ question, playerAnswers, gradingIndex, total }) => {
+        socket.on('session:grading_question', ({ question, playerAnswers, distribution, gradingIndex, total }) => {
+            setGradingDistribution(distribution)
             setPhase('grading')
             setGradingQuestion(question)
             setGradingPlayerAnswers(playerAnswers)
@@ -191,6 +194,7 @@ function HostLive() {
                             <audio key={gradingQuestion.id} controls src={`${mediaBase}/${gradingQuestion.audio_path}`} className="w-full mb-3" />
                         )}
 
+                        <AnswerDistribution distribution={gradingDistribution} />
                         <div className="flex flex-col gap-2 mt-3">
                             {gradingPlayerAnswers.map(a => {
                                 const grade = localGrades[a.username]

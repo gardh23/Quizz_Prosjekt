@@ -23,6 +23,29 @@ function isChoice(type) {
     return type === 'multiple_choice' || type === 'true_false'
 }
 
+// Only pick-one questions have options to count; other types list each answer instead.
+function buildDistribution(session, question) {
+    if (!isChoice(question.type)) return null
+    const picks = Object.values(session.players).map(p => p.answers[question.id]?.answerId)
+    return (question.answers || []).filter(Boolean).map(a => ({
+        id: a.id,
+        text: a.text,
+        count: picks.filter(id => id === a.id).length,
+        isCorrect: !!a.is_correct
+    }))
+}
+
+function gradingPayload(session) {
+    const question = session.questions[session.gradingIndex]
+    return {
+        question,
+        playerAnswers: buildPlayerAnswers(session, question),
+        distribution: buildDistribution(session, question),
+        gradingIndex: session.gradingIndex,
+        total: session.questions.length
+    }
+}
+
 // Accepts "8 849" or "8849,5" as a Norwegian host might type it.
 function parseNumber(text) {
     return Number(String(text ?? '').replace(/\s/g, '').replace(',', '.'))
@@ -430,13 +453,7 @@ module.exports = function (io, db = pool, {
             if (session.currentQuestion >= session.questions.length) {
                 session.status = 'grading'
                 session.gradingIndex = 0
-                const firstQuestion = session.questions[0]
-                io.to(roomCode).emit('session:grading_question', {
-                    question: firstQuestion,
-                    playerAnswers: buildPlayerAnswers(session, firstQuestion),
-                    gradingIndex: 0,
-                    total: session.questions.length
-                })
+                io.to(roomCode).emit('session:grading_question', gradingPayload(session))
                 return
             }
 
@@ -479,13 +496,7 @@ module.exports = function (io, db = pool, {
                 return
             }
 
-            const question = session.questions[session.gradingIndex]
-            io.to(roomCode).emit('session:grading_question', {
-                question,
-                playerAnswers: buildPlayerAnswers(session, question),
-                gradingIndex: session.gradingIndex,
-                total: session.questions.length
-            })
+            io.to(roomCode).emit('session:grading_question', gradingPayload(session))
         })
 
         on('host:set_timer', ({ roomCode, seconds }) => {
@@ -652,13 +663,7 @@ module.exports = function (io, db = pool, {
             socket.emit('session:players', { players: publicPlayers(session) })
 
             if (session.status === 'grading') {
-                const question = session.questions[session.gradingIndex]
-                io.to(roomCode).emit('session:grading_question', {
-                    question,
-                    playerAnswers: buildPlayerAnswers(session, question),
-                    gradingIndex: session.gradingIndex,
-                    total: session.questions.length
-                })
+                io.to(roomCode).emit('session:grading_question', gradingPayload(session))
                 return
             }
 

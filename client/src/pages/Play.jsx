@@ -1,6 +1,7 @@
 import socket from '../socket'
 import { useState, useEffect, useRef } from 'react'
 import { mediaBase } from '../api'
+import AnswerDistribution from '../components/AnswerDistribution'
 
 function Play() {
     const [answered, setAnswered] = useState(false)
@@ -32,6 +33,7 @@ function Play() {
     // Rettefase
     const [gradingQuestion, setGradingQuestion] = useState(null)
     const [gradingPlayerAnswers, setGradingPlayerAnswers] = useState([])
+    const [gradingDistribution, setGradingDistribution] = useState(null)
     const [gradingIndex, setGradingIndex] = useState(0)
     const [gradingTotal, setGradingTotal] = useState(0)
 
@@ -135,7 +137,8 @@ function Play() {
                 })
             }, 1000)
         })
-        socket.on('session:grading_question', ({ question, playerAnswers, gradingIndex, total }) => {
+        socket.on('session:grading_question', ({ question, playerAnswers, distribution, gradingIndex, total }) => {
+            setGradingDistribution(distribution)
             setGradingQuestion(question)
             setGradingPlayerAnswers(playerAnswers)
             setGradingIndex(gradingIndex)
@@ -263,6 +266,7 @@ function Play() {
                         {gradingQuestion.audio_path && (
                             <audio key={gradingQuestion.id} controls src={`${mediaBase}/${gradingQuestion.audio_path}`} className="w-full mb-3" />
                         )}
+                        <AnswerDistribution distribution={gradingDistribution} />
                         <div className="flex flex-col gap-2 mt-3">
                             {gradingPlayerAnswers.map(a => (
                                 <div key={a.username} className={`flex items-center justify-between rounded-xl px-4 py-3 ${a.username === usernameRef.current ? 'bg-purple-100' : 'bg-purple-50'}`}>
