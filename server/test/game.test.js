@@ -6,6 +6,27 @@ let server
 beforeEach(async () => { server = await startServer() })
 afterEach(async () => { await server.close() })
 
+test('players with the same score share a place on the leaderboard', async () => {
+    const { host, players: [ada, bob, cid], roomCode } = await startGame(server, ['ada', 'bob', 'cid'])
+    for (const [p, answerId] of [[ada, 11], [bob, 11], [cid, 12]]) {
+        p.emit('player:answer', { roomCode, answerId })
+        await once(p, 'player:answer_result')
+    }
+    host.emit('host:next', { roomCode })
+    await once(host, 'session:question')
+    host.emit('host:next', { roomCode })
+    await once(host, 'session:grading_question')
+    host.emit('host:grading_next', { roomCode })
+    await once(host, 'session:grading_question')
+    const finished = once(host, 'session:finished')
+    host.emit('host:grading_next', { roomCode })
+    const { leaderboard } = await finished
+    assert.deepEqual(
+        leaderboard.map(p => [p.username, p.rank]),
+        [['ada', 1], ['bob', 1], ['cid', 3]]
+    )
+})
+
 test('a full game runs from start to leaderboard', async () => {
     const { host, players: [ada, bob], roomCode } = await startGame(server)
 
