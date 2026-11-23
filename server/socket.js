@@ -41,8 +41,22 @@ function gradingPayload(session) {
         question,
         playerAnswers: buildPlayerAnswers(session, question),
         distribution: buildDistribution(session, question),
+        revealed: !!session.revealed,
         gradingIndex: session.gradingIndex,
         total: session.questions.length
+    }
+}
+
+// Until the host reveals, players see what everyone answered but nothing that gives away
+// the key: no is_correct, no right/wrong, no points, no marked option in the distribution.
+function gradingForPlayers(payload) {
+    if (payload.revealed) return payload
+    return {
+        ...payload,
+        question: questionForPlayers(payload.question),
+        playerAnswers: payload.playerAnswers.map(({ username, answered, answerText, freeTextResponse }) =>
+            ({ username, answered, answerText, freeTextResponse })),
+        distribution: payload.distribution && payload.distribution.map(({ id, text, count }) => ({ id, text, count }))
     }
 }
 
@@ -175,12 +189,20 @@ module.exports = function (io, db = pool, {
     const sessions = {}
 
     function emitGrading(roomCode, session) {
-        io.to(roomCode).emit('session:grading_question', gradingPayload(session))
+        const payload = gradingPayload(session)
+        const forPlayers = gradingForPlayers(payload)
+        if (session.host) {
+            io.to(roomCode).except(session.host).emit('session:grading_question', forPlayers)
+            io.to(session.host).emit('session:grading_question', payload)
+        } else {
+            io.to(roomCode).emit('session:grading_question', forPlayers)
+        }
     }
 
     function startGrading(roomCode, session) {
         session.status = 'grading'
         session.gradingIndex = 0
+        session.revealed = false
         emitGrading(roomCode, session)
     }
 
@@ -519,6 +541,26 @@ module.exports = function (io, db = pool, {
                 return
             }
 
+            session.revealed = false
+            emitGrading(roomCode, session)
+        })
+
+        on('host:reveal', ({ roomCode }) => {
+            if (!socket.user || (socket.user.role !== 'host' && socket.user.role !== 'admin')) {
+                socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
+            const session = sessions[roomCode]
+            if (!session || session.host !== socket.id) {
+                socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
+            if (session.status !== 'grading') {
+                socket.emit('error', { message: 'Ikke i rettefasen' })
+                return
+            }
+
+            session.revealed = true
             emitGrading(roomCode, session)
         })
 
@@ -618,8 +660,9 @@ module.exports = function (io, db = pool, {
             ans.graded = true
             ans.points = points
 
-            io.to(roomCode).emit('session:answer_graded', { username: player.username, isCorrect, points })
-            io.to(roomCode).emit('session:players', { players: publicPlayers(session) })
+            // Only the host gets the verdict directly; players see it through the grading view once revealed.
+            socket.emit('session:answer_graded', { username: player.username, isCorrect, points })
+            emitGrading(roomCode, session)
         })
 
 

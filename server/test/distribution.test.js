@@ -14,7 +14,8 @@ test('grading a choice question includes how many picked each option', async () 
     }
     host.emit('host:next', { roomCode })
     await once(host, 'session:question')
-    const grading = once(ada, 'session:grading_question')
+    // The host view; players only get isCorrect after reveal (see reveal.test.js).
+    const grading = once(host, 'session:grading_question')
     host.emit('host:next', { roomCode })
     const { distribution } = await grading
     assert.deepEqual(distribution, [
@@ -22,7 +23,7 @@ test('grading a choice question includes how many picked each option', async () 
         { id: 12, text: '5', count: 1, isCorrect: false }
     ])
 
-    const freeText = once(ada, 'session:grading_question')
+    const freeText = once(host, 'session:grading_question')
     host.emit('host:grading_next', { roomCode })
     assert.equal((await freeText).distribution, null)
 })
