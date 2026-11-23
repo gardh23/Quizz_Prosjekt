@@ -37,7 +37,7 @@ function generateRoomCode() {
     return `${adj}-${noun}`
 }
 
-module.exports = function (io) {
+module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
     const sessions = {}
 
     io.on('connection', (socket) => {
@@ -49,7 +49,7 @@ module.exports = function (io) {
                 return
             }
             try {
-                const result = await pool.query('SELECT * FROM quizzes WHERE id = $1', [quizId])
+                const result = await db.query('SELECT * FROM quizzes WHERE id = $1', [quizId])
                 if (result.rows.length === 0) {
                     socket.emit('error', { message: 'Quiz ikke funnet' })
                     return
@@ -141,7 +141,7 @@ module.exports = function (io) {
                 return
             }
 
-            const questionsResult = await pool.query(
+            const questionsResult = await db.query(
                 'SELECT questions.*, json_agg(answers.*) as answers FROM questions LEFT JOIN answers ON answers.question_id = questions.id WHERE questions.quiz_id = $1 GROUP BY questions.id ORDER BY questions.order_index',
                 [session.quizId]
             )
@@ -233,7 +233,6 @@ module.exports = function (io) {
                 return
             }
 
-            const countdownSeconds = 5
             session.questionStartedAt = null
             io.to(roomCode).emit('session:countdown', { seconds: countdownSeconds })
 
