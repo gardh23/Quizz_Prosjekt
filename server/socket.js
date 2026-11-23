@@ -31,6 +31,34 @@ function buildPlayerAnswers(session, question) {
     })
 }
 
+// Players must never see is_correct or the free-text key before the grading phase.
+function questionForPlayers(question) {
+    if (!question) return question
+    const answers = question.type === 'free_text'
+        ? []
+        : (question.answers || []).filter(Boolean).map(({ id, text }) => ({ id, text }))
+    return { ...question, answers }
+}
+
+// Broadcast to the whole room, so it only says WHO has answered — not what or whether it was right.
+function publicPlayers(session) {
+    return Object.values(session.players).map(p => ({
+        username: p.username,
+        connected: p.connected,
+        answers: Object.fromEntries(Object.keys(p.answers).map(id => [id, true]))
+    }))
+}
+
+function emitQuestion(io, roomCode, session, event, payload) {
+    const forPlayers = { ...payload, question: questionForPlayers(payload.question) }
+    if (session.host) {
+        io.to(roomCode).except(session.host).emit(event, forPlayers)
+        io.to(session.host).emit(event, payload)
+    } else {
+        io.to(roomCode).emit(event, forPlayers)
+    }
+}
+
 function generateRoomCode() {
     const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
     const noun = nouns[Math.floor(Math.random() * nouns.length)]
@@ -102,8 +130,8 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
                 const timeRemaining = currentQuestion
                     ? Math.max(0, Math.round(currentQuestion.time_limit - (Date.now() - session.questionStartedAt) / 1000))
                     : null
-                socket.emit('player:rejoined', { score: playerData.score, status: session.status, question: currentQuestion, timeRemaining })
-                io.to(roomCode).emit('session:players', { players: Object.values(session.players) })
+                socket.emit('player:rejoined', { score: playerData.score, status: session.status, question: questionForPlayers(currentQuestion), timeRemaining })
+                io.to(roomCode).emit('session:players', { players: publicPlayers(session) })
                 return
             }
 
@@ -125,7 +153,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
 
             socket.join(roomCode)
             socket.emit('player:joined', { roomCode })
-            io.to(roomCode).emit('session:players', { players: Object.values(session.players) })
+            io.to(roomCode).emit('session:players', { players: publicPlayers(session) })
             console.log(`${username} joined ${roomCode}`)
         })
 
@@ -153,7 +181,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
             session.questionStartedAt = Date.now()
 
             const question = session.questions[session.currentQuestion]
-            io.to(roomCode).emit('session:question', { question, index: 0, total: session.questions.length })
+            emitQuestion(io, roomCode, session, 'session:question', { question, index: 0, total: session.questions.length })
         })
 
         socket.on('player:answer', ({ roomCode, answerId, timeUsed, freeTextResponse }) => {
@@ -191,7 +219,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
 
             player.answers[question.id] = { answerId, isCorrect, points, timeUsed, freeTextResponse: safeResponse, graded: false }
             player.score += points
-            socket.emit('player:answer_result', { isCorrect, points })
+            socket.emit('player:answer_result', {})
             if (question.type === 'free_text') {
                 const hostSocket = io.sockets.sockets.get(session.host)
                 if (hostSocket) {
@@ -203,7 +231,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
                     })
                 }
             }
-            io.to(roomCode).emit('session:players', { players: Object.values(session.players) })
+            io.to(roomCode).emit('session:players', { players: publicPlayers(session) })
         })
 
         socket.on('host:next', ({ roomCode }) => {
@@ -239,7 +267,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
             const question = session.questions[session.currentQuestion]
             setTimeout(() => {
                 session.questionStartedAt = Date.now()
-                io.to(roomCode).emit('session:question', { question, index: session.currentQuestion, total: session.questions.length })
+                emitQuestion(io, roomCode, session, 'session:question', { question, index: session.currentQuestion, total: session.questions.length })
             }, countdownSeconds * 1000)
         })
 
@@ -319,7 +347,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
             player.score += points
 
             io.to(roomCode).emit('session:answer_graded', { username: player.username, isCorrect, points })
-            io.to(roomCode).emit('session:players', { players: Object.values(session.players) })
+            io.to(roomCode).emit('session:players', { players: publicPlayers(session) })
         })
 
 
@@ -335,7 +363,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
                     io.to(roomCode).emit('session:frozen', { message: 'Host koblet fra — venter på at host kobler til igjen' })
                 } else if (session.players[socket.id]) {
                     session.players[socket.id].connected = false
-                    io.to(roomCode).emit('session:players', { players: Object.values(session.players) })
+                    io.to(roomCode).emit('session:players', { players: publicPlayers(session) })
                 }
             }
         })
@@ -375,10 +403,10 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
             socket.emit('player:rejoined', {
                 score: session.players[socket.id].score,
                 status: session.status,
-                question: currentQuestion,
+                question: questionForPlayers(currentQuestion),
                 timeRemaining
             })
-            io.to(roomCode).emit('session:players', { players: Object.values(session.players) })
+            io.to(roomCode).emit('session:players', { players: publicPlayers(session) })
         })
 
         socket.on('host:rejoin', ({ roomCode }) => {
@@ -401,7 +429,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5 } = {}) {
 
             const question = session.questions[session.currentQuestion]
             socket.emit('host:rejoined', { roomCode })
-            io.to(roomCode).emit('session:resumed', { question, index: session.currentQuestion, total: session.questions.length })
+            emitQuestion(io, roomCode, session, 'session:resumed', { question, index: session.currentQuestion, total: session.questions.length })
         })
 
 

@@ -99,10 +99,10 @@ async function joinPlayers(server, roomCode, names) {
 async function startGame(server, names = ['ada', 'bob'], { speedBonus = false } = {}) {
     const { host, roomCode } = await createRoom(server)
     const players = await joinPlayers(server, roomCode, names)
-    const firstQuestion = Promise.all(players.map(p => once(p, 'session:question')))
+    const firstQuestion = Promise.all([host, ...players].map(s => once(s, 'session:question')))
     host.emit('host:start', { roomCode, speedBonus })
-    const [{ question }] = await firstQuestion
-    return { host, players, roomCode, question }
+    const [{ question: hostQuestion }, { question }] = await firstQuestion
+    return { host, players, roomCode, question, hostQuestion }
 }
 
 module.exports = { HOST, OTHER_HOST, questions, fakeDb, startServer, once, never, createRoom, joinPlayers, startGame }
