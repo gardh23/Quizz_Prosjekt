@@ -155,7 +155,9 @@ function HostLive() {
 
     // Rettefase
     if (gradingQuestion) {
-        const correctAnswers = gradingQuestion.answers?.filter(a => a.is_correct) || []
+        const correctAnswers = gradingQuestion.type === 'ranking'
+            ? [{ id: 'order', text: (gradingQuestion.answers || []).filter(Boolean).map(a => a.text).join(' → ') }]
+            : gradingQuestion.answers?.filter(a => a.is_correct) || []
         return (
             <div className="min-h-screen bg-purple-900 p-8">
                 <UserBadge />

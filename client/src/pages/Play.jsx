@@ -21,6 +21,7 @@ function Play() {
     const [questionStartTime, setQuestionStartTime] = useState(null)
     const [freeTextInput, setFreeTextInput] = useState('')
     const [numberInput, setNumberInput] = useState('')
+    const [rankingOrder, setRankingOrder] = useState([])
     const [question, setQuestion] = useState(null)
     const audioRef = useRef(null)
     const [audioPlaying, setAudioPlaying] = useState(false)
@@ -79,6 +80,7 @@ function Play() {
             setJoined(true)
             if (status === 'active' && question) {
                 setQuestion(question)
+                setRankingOrder(question.answers || [])
                 setQuestionStartTime(Date.now())
                 startTimer(timeRemaining)
             }
@@ -99,6 +101,7 @@ function Play() {
             setSelectedAnswerId(null)
             setFreeTextInput('')
             setNumberInput('')
+            setRankingOrder(question.answers || [])
             setAudioPlaying(false)
             setCountdownLeft(null)
             if (countdownRef.current) clearInterval(countdownRef.current)
@@ -230,7 +233,9 @@ function Play() {
     }
 
     if (joined && gradingQuestion) {
-        const correctAnswers = gradingQuestion.answers?.filter(a => a.is_correct) || []
+        const correctAnswers = gradingQuestion.type === 'ranking'
+            ? [{ id: 'order', text: (gradingQuestion.answers || []).filter(Boolean).map(a => a.text).join(' → ') }]
+            : gradingQuestion.answers?.filter(a => a.is_correct) || []
         return (
             <div className="min-h-screen bg-purple-900 p-6">
                 <div className="max-w-2xl mx-auto">
@@ -356,6 +361,36 @@ function Play() {
                                     {answer.text}
                                 </button>
                             ))}
+                        </div>
+                    )}
+                    {question.type === 'ranking' && (
+                        <div className="flex flex-col gap-3 max-w-lg mx-auto mt-4">
+                            {rankingOrder.map((item, i) => {
+                                const move = (to) => {
+                                    const updated = [...rankingOrder]
+                                    ;[updated[i], updated[to]] = [updated[to], updated[i]]
+                                    setRankingOrder(updated)
+                                }
+                                const locked = answered || timeLeft === 0
+                                return (
+                                    <div key={item.id} className="flex items-center gap-3 bg-white rounded-xl px-4 py-3 shadow">
+                                        <span className="w-6 font-bold text-purple-700">{i + 1}.</span>
+                                        <span className="flex-1 text-lg font-semibold text-purple-900">{item.text}</span>
+                                        <button type="button" aria-label={`Flytt ${item.text} opp`} onClick={() => move(i - 1)} disabled={locked || i === 0}
+                                            className="bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold w-10 h-10 rounded-lg disabled:opacity-30">▲</button>
+                                        <button type="button" aria-label={`Flytt ${item.text} ned`} onClick={() => move(i + 1)} disabled={locked || i === rankingOrder.length - 1}
+                                            className="bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold w-10 h-10 rounded-lg disabled:opacity-30">▼</button>
+                                    </div>
+                                )
+                            })}
+                            <button
+                                onClick={() => socket.emit('player:answer', { roomCode, ranking: rankingOrder.map(a => a.id) })}
+                                disabled={answered || timeLeft === 0}
+                                className="bg-green-500 hover:bg-green-600 text-white font-bold text-xl py-4 rounded-xl transition-colors
+  disabled:opacity-50"
+                            >
+                                Send rekkefølge
+                            </button>
                         </div>
                     )}
                     {question.type === 'number_estimate' && (

@@ -48,6 +48,10 @@ function buildPlayerAnswers(session, question) {
         if (question.type === 'number_estimate') {
             return { username: player.username, socketId, answered: true, answerText: String(ans.numberResponse), isCorrect: ans.isCorrect, points: ans.points }
         }
+        if (question.type === 'ranking') {
+            const textOf = id => (question.answers || []).find(a => a && a.id === id)?.text ?? '?'
+            return { username: player.username, socketId, answered: true, answerText: ans.ranking.map(textOf).join(' → '), isCorrect: ans.isCorrect, points: ans.points }
+        }
         if (isChoice(question.type)) {
             const answerObj = (question.answers || []).find(a => a.id === ans.answerId)
             return { username: player.username, socketId, answered: true, answerText: answerObj ? answerObj.text : '?', isCorrect: ans.isCorrect, points: ans.points }
@@ -58,12 +62,38 @@ function buildPlayerAnswers(session, question) {
 }
 
 // Players must never see is_correct or the free-text key before the grading phase.
+// Ranking options are stored in the correct order, so players get the shuffled playerOrder.
 function questionForPlayers(question) {
     if (!question) return question
-    const answers = question.type === 'free_text' || question.type === 'number_estimate'
-        ? []
-        : (question.answers || []).filter(Boolean).map(({ id, text }) => ({ id, text }))
-    return { ...question, answers }
+    if (question.type === 'free_text' || question.type === 'number_estimate') {
+        return { ...question, answers: [] }
+    }
+    let options = (question.answers || []).filter(Boolean)
+    if (question.playerOrder) {
+        options = question.playerOrder.map(id => options.find(a => a.id === id))
+    }
+    return { ...question, playerOrder: undefined, answers: options.map(({ id, text }) => ({ id, text })) }
+}
+
+// Fisher-Yates, redrawn if it happens to land on the correct order.
+function shuffledIds(ids) {
+    if (ids.length < 2) return [...ids]
+    for (let attempt = 0; attempt < 20; attempt++) {
+        const order = [...ids]
+        for (let i = order.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1))
+            ;[order[i], order[j]] = [order[j], order[i]]
+        }
+        if (order.some((id, i) => id !== ids[i])) return order
+    }
+    return [...ids.slice(1), ids[0]]
+}
+
+function isPermutationOf(candidate, ids) {
+    return Array.isArray(candidate)
+        && candidate.length === ids.length
+        && new Set(candidate).size === candidate.length
+        && candidate.every(id => ids.includes(id))
 }
 
 // Broadcast to the whole room, so it only says WHO has answered — not what or whether it was right.
@@ -276,6 +306,12 @@ module.exports = function (io, db = pool, {
             }
 
             session.questions = questionsResult.rows
+            // Shuffled once so every player, and anyone who rejoins, sees the same order.
+            for (const q of session.questions) {
+                if (q.type === 'ranking') {
+                    q.playerOrder = shuffledIds((q.answers || []).filter(Boolean).map(a => a.id))
+                }
+            }
             session.speedBonus = speedBonus || false
             session.status = 'active'
             session.currentQuestion = 0
@@ -285,7 +321,7 @@ module.exports = function (io, db = pool, {
             emitQuestion(io, roomCode, session, 'session:question', { question, index: 0, total: session.questions.length })
         })
 
-        on('player:answer', ({ roomCode, answerId, freeTextResponse, numberResponse }) => {
+        on('player:answer', ({ roomCode, answerId, freeTextResponse, numberResponse, ranking }) => {
             const session = sessions[roomCode]
 
             if (!session || session.status !== 'active') {
@@ -329,6 +365,16 @@ module.exports = function (io, db = pool, {
                 }
                 const precision = estimatePrecision(numberResponse, parseNumber(question.answers?.[0]?.text))
                 record.numberResponse = numberResponse
+                record.isCorrect = precision >= 0.5
+                record.points = precisionPoints(precision, session.speedBonus)
+            } else if (question.type === 'ranking') {
+                const correctIds = (question.answers || []).filter(Boolean).map(a => a.id)
+                if (!isPermutationOf(ranking, correctIds)) {
+                    socket.emit('error', { message: 'Ugyldig rekkefølge' })
+                    return
+                }
+                const precision = ranking.filter((id, i) => id === correctIds[i]).length / correctIds.length
+                record.ranking = ranking
                 record.isCorrect = precision >= 0.5
                 record.points = precisionPoints(precision, session.speedBonus)
             } else {

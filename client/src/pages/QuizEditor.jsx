@@ -13,6 +13,7 @@ const emptyAnswers = [
 const defaultAnswers = (type) => {
     if (type === 'true_false') return [{ text: 'Sant', is_correct: true }, { text: 'Usant', is_correct: false }]
     if (type === 'number_estimate') return [{ text: '', is_correct: true }]
+    if (type === 'ranking') return emptyAnswers.map(a => ({ ...a, is_correct: true }))
     return emptyAnswers
 }
 
@@ -47,7 +48,9 @@ function QuizEditor() {
         setType(q.type)
         setText(q.text)
         setTimeLimit(q.time_limit)
-        setAnswers(q.answers && q.answers.length > 0 ? q.answers : emptyAnswers)
+        const saved = q.answers && q.answers.length > 0 ? q.answers : defaultAnswers(q.type)
+        // Ranking keeps four slots in the form even if fewer were saved.
+        setAnswers(q.type === 'ranking' ? [...saved, ...defaultAnswers('ranking')].slice(0, Math.max(4, saved.length)) : saved)
         setImageFile(null)
         setAudioFile(null)
         setImageWidth(q.image_width || 100)
@@ -56,11 +59,16 @@ function QuizEditor() {
 
     const submitQuestion = async (e) => {
         e.preventDefault()
+        const toSave = type === 'ranking' ? answers.filter(a => a.text.trim()) : answers
+        if (type === 'ranking' && toSave.length < 2) {
+            window.alert('Rangering trenger minst to alternativer')
+            return
+        }
         const formData = new FormData()
         formData.append('type', type)
         formData.append('text', text)
         formData.append('time_limit', timeLimit)
-        formData.append('answers', JSON.stringify(answers))
+        formData.append('answers', JSON.stringify(toSave))
         formData.append('image_width', imageWidth)
         if (imageFile) formData.append('image', imageFile)
         if (audioFile) formData.append('audio', audioFile)
@@ -71,13 +79,13 @@ function QuizEditor() {
             setQuiz({
                 ...quiz,
                 questions: quiz.questions.map(q =>
-                    q.id === editingQuestion.id ? { ...q, type, text, time_limit: timeLimit, answers, image_width: imageWidth } : q
+                    q.id === editingQuestion.id ? { ...q, type, text, time_limit: timeLimit, answers: toSave, image_width: imageWidth } : q
                 )
             })
         } else {
             formData.append('order_index', quiz.questions.length + 1)
             const res = await api.post(`/quizzes/${id}/questions`, formData)
-            setQuiz({ ...quiz, questions: [...quiz.questions, { ...res.data, answers }] })
+            setQuiz({ ...quiz, questions: [...quiz.questions, { ...res.data, answers: toSave }] })
         }
 
         resetForm()
@@ -185,6 +193,7 @@ function QuizEditor() {
                             <option value="free_text">Fritekst</option>
                             <option value="true_false">Sant/usant</option>
                             <option value="number_estimate">Tallestimat</option>
+                            <option value="ranking">Rangering</option>
                         </select>
 
                         <input
@@ -290,6 +299,27 @@ function QuizEditor() {
                                         />
                                         <span className="text-gray-700 text-lg">{answer.text}</span>
                                     </label>
+                                ))}
+                            </div>
+                        )}
+
+                        {type === 'ranking' && (
+                            <div className="flex flex-col gap-2">
+                                <p className="text-sm text-gray-500">Skriv alternativene i riktig rekkefølge — spillerne får dem stokket.</p>
+                                {answers.map((answer, i) => (
+                                    <div key={i} className="flex items-center gap-3">
+                                        <span className="w-6 text-right font-bold text-purple-700">{i + 1}.</span>
+                                        <input
+                                            value={answer.text}
+                                            onChange={e => {
+                                                const updated = [...answers]
+                                                updated[i] = { ...updated[i], text: e.target.value }
+                                                setAnswers(updated)
+                                            }}
+                                            placeholder={i === 0 ? 'Først' : `Plass ${i + 1}`}
+                                            className="flex-1 border-2 border-gray-200 rounded-xl p-3 focus:outline-none focus:border-purple-500"
+                                        />
+                                    </div>
                                 ))}
                             </div>
                         )}

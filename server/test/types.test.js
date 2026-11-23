@@ -79,4 +79,70 @@ test('estimate: a non-number is rejected', async () => {
     assert.match(err.message, /ugyldig tall/i)
 })
 
+const ranking = {
+    id: 3, type: 'ranking', text: 'Sorter fra minst til størst', time_limit: 20, order_index: 0,
+    answers: [
+        { id: 31, question_id: 3, text: 'Mus', is_correct: true },
+        { id: 32, question_id: 3, text: 'Katt', is_correct: true },
+        { id: 33, question_id: 3, text: 'Hest', is_correct: true },
+        { id: 34, question_id: 3, text: 'Elefant', is_correct: true }
+    ]
+}
+
+async function rankingGame(orders, { speedBonus = false } = {}) {
+    server = await startServer({ db: fakeDb([ranking]) })
+    const names = Object.keys(orders)
+    const { host, players, roomCode } = await startGame(server, names, { speedBonus })
+    for (const [i, name] of names.entries()) {
+        players[i].emit('player:answer', { roomCode, ranking: orders[name] })
+        await once(players[i], 'player:answer_result')
+    }
+    const { playerAnswers } = await gradingFor(host, roomCode)
+    return Object.fromEntries(playerAnswers.map(a => [a.username, a]))
+}
+
+test('ranking: players get the options shuffled, the same way for everyone', async () => {
+    server = await startServer({ db: fakeDb([ranking]) })
+    const { roomCode, question, players: [ada, bob] } = await startGame(server, ['ada', 'bob'])
+    const ids = question.answers.map(a => a.id)
+    assert.notDeepEqual(ids, [31, 32, 33, 34])
+    assert.deepEqual([...ids].sort(), [31, 32, 33, 34])
+    assert.equal(question.answers.some(a => 'is_correct' in a), false)
+    void ada
+
+    bob.disconnect()
+    await new Promise(r => setTimeout(r, 50))
+    const again = server.client()
+    again.emit('player:rejoin', { roomCode, username: 'bob' })
+    const { question: rejoined } = await once(again, 'player:rejoined')
+    assert.deepEqual(rejoined.answers.map(a => a.id), ids)
+})
+
+test('ranking without speed bonus: 1 point when at least half the positions are right', async () => {
+    const byName = await rankingGame({
+        ada: [31, 32, 33, 34],
+        bob: [31, 32, 34, 33],
+        cid: [32, 33, 34, 31]
+    })
+    assert.deepEqual([byName.ada.points, byName.ada.answerText], [1, 'Mus → Katt → Hest → Elefant'])
+    assert.equal(byName.bob.points, 1)
+    assert.equal(byName.cid.points, 0)
+})
+
+test('ranking with speed bonus: 0-1000 by share of correct positions', async () => {
+    const byName = await rankingGame({ ada: [31, 32, 33, 34], bob: [31, 32, 34, 33] }, { speedBonus: true })
+    assert.equal(byName.ada.points, 1000)
+    assert.equal(byName.bob.points, 500)
+})
+
+test('ranking: an order that is not a permutation of the options is rejected', async () => {
+    server = await startServer({ db: fakeDb([ranking]) })
+    const { players: [ada], roomCode } = await startGame(server, ['ada'])
+    for (const bad of [[31, 31, 33, 34], [31, 32, 33], [31, 32, 33, 99], 'abc']) {
+        ada.emit('player:answer', { roomCode, ranking: bad })
+        const err = await once(ada, 'error')
+        assert.match(err.message, /ugyldig rekkefølge/i)
+    }
+})
+
 module.exports = { gradingFor }
