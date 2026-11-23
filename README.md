@@ -62,6 +62,7 @@ Quizz/
 │   ├── index.js         # Express-server, auto-opprett uploads/, Socket.io JWT-middleware
 │   ├── db.js            # PostgreSQL Pool-tilkobling via env-variabler
 │   ├── socket.js        # All Socket.io spilløkt-logikk
+│   ├── test/            # node:test-tester for spilllogikken (ekte Socket.io-server, falsk DB)
 │   ├── routes/
 │   │   ├── auth.js      # POST /auth/register og /auth/login (rate limited)
 │   │   ├── quiz.js      # CRUD for quizer og spørsmål, inkl. filopplasting og image_width
@@ -95,26 +96,26 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 
 ### Host sender:
 - `host:create` → oppretter spilløkt med romkode
-- `host:start` → starter quiz med `speedBonus`-valg fra lobbyen
-- `host:next` → starter nedtelling og sender neste spørsmål automatisk; etter siste spørsmål starter rettefasen
-- `host:set_timer` → overstyrer timer live
-- `host:grade` → vurderer fritekst-svar (isCorrect: true/false) — kun i rettefasen
+- `host:start` → starter quiz med `speedBonus`-valg fra lobbyen (kun fra lobbyen, quizen må ha spørsmål)
+- `host:next` → starter nedtelling og sender neste spørsmål automatisk; etter siste spørsmål starter rettefasen. Ignoreres under nedtelling
+- `host:set_timer` → overstyrer timer live, og flytter serverens svarfrist (0–3600 sek)
+- `host:grade` → vurderer fritekst-svar (isCorrect: true/false) — kun i rettefasen. Ny vurdering erstatter forrige
 - `host:grading_next` → går til neste spørsmål i rettefasen, eller avslutter med leaderboard
-- `host:rejoin` → gjenkobler etter frakobling
+- `host:rejoin` → gjenkobler etter frakobling — kun samme host-bruker, og quizen fortsetter i fasen den var i
 
 ### Spiller sender:
 - `player:join` → blir med i rom; hvis samme brukernavn finnes og er frakoblet, behandles som rejoin
-- `player:answer` → sender svar (answerId + timeUsed + freeTextResponse for fritekst); fritekst kan sendes inn på nytt for å oppdatere
+- `player:answer` → sender svar (answerId, eller freeTextResponse for fritekst); fritekst kan sendes inn på nytt for å oppdatere. Svartiden måles av serveren
 - `player:rejoin` → gjenkobler etter frakobling (kun hvis spilleren er markert frakoblet)
 
 ### Server sender til rom:
 - `host:created` → romkode klar
 - `player:joined` → bekreftelse til spiller
 - `player:rejoined` → bekreftelse på rejoin med `{ score, status, question, timeRemaining }`
-- `session:players` → oppdatert spillerliste (inkl. answers for å vise hvem som har svart)
-- `session:question` → nytt spørsmål
+- `session:players` → oppdatert spillerliste `{ username, connected, answers: { [questionId]: true } }` — sier bare HVEM som har svart, ikke hva eller om det var riktig
+- `session:question` → nytt spørsmål. Spillere får bare `{ id, text }` per alternativ (fritekst: ingen alternativer); host får hele spørsmålet med fasit
 - `session:countdown` → nedtelling mellom spørsmål `{ seconds: 5 }`
-- `player:answer_result` → bekreftelse på svar (til spiller); vises som flash-melding
+- `player:answer_result` → tom kvittering på svar (til spiller); vises som flash-melding. Sier ikke om svaret var riktig
 - `host:free_text_answer` → fritekst-svar videresendt til host (oppdaterer eksisterende ved re-innsending)
 - `session:grading_question` → starter/oppdaterer rettefasen med `{ question, playerAnswers, gradingIndex, total }` — sendes til hele rommet
 - `session:answer_graded` → kringkastes til hele rommet når host retter et svar `{ username, isCorrect, points }`
@@ -128,7 +129,11 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 
 - **Delt socket-instans**: `client/src/socket.js` eksporterer én instans — unngår doble tilkoblinger
 - **useRef for username i Play.jsx**: Løser stale closure-problem i useEffect med tom dependency array
-- **Romkode som ordpar**: Genereres som `ADJEKTIV-SUBSTANTIV` (f.eks. `GLAD-HEST`) fra to ordlister — 2750+ kombinasjoner. Spillere kan skrive med mellomrom eller bindestrek, normaliseres til uppercase med bindestrek
+- **Romkode som ordpar**: Genereres som `ADJEKTIV-SUBSTANTIV` (f.eks. `GLAD-HEST`) fra to ordlister — 2750+ kombinasjoner. Trekkes på nytt til koden er ledig (maks 50 forsøk). Spillere kan skrive med mellomrom eller bindestrek, normaliseres til uppercase med bindestrek
+- **Fasit holdes på serveren**: `questionForPlayers` fjerner `is_correct` og fritekst-fasit før spørsmål sendes til spillere; `publicPlayers` fjerner svar og poeng fra spillerlista. Fasit vises først i rettefasen
+- **Serveren eier klokka**: `openQuestion` setter `questionStartedAt` og `questionDeadline`. Svar etter fristen (+1 sek slingringsmonn for nettverk) og under nedtelling avvises. Hastighetspoeng beregnes fra serverens tid og begrenses til 0–1000
+- **Krasjsikre hendelser**: Alle socket-hendelser går via `on()`-innpakningen i `socket.js`, som tåler manglende payload og gjør feil om til en `error`-hendelse i stedet for å krasje prosessen (som ville slettet alle pågående spill)
+- **Opprydding**: Hver hendelse oppdaterer rommets `lastActivity`; rom som har vært inaktive i 2 timer slettes
 - **freeTextResponse**: Spillers tekst sendes separat fra `answerId` (fasit-IDen); kan sendes inn på nytt så lenge timer ikke er ute
 - **Fritekst-poeng**: Settes til 0 ved innsending — host vurderer med `host:grade` i rettefasen
 - **Rettefase**: Etter siste spørsmål går quizen inn i `status: 'grading'`. Host blar gjennom alle spørsmål med `host:grading_next`. Flervalg rettes automatisk, fritekst manuelt. Alle spillere ser alle svar og rettingen live via `session:grading_question` og `session:answer_graded`. Leaderboard vises kun etter rettefasen.
@@ -142,7 +147,7 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 - **Rejoin-sikkerhet**: `player:rejoin` krever `connected === false` — kan ikke ta over plass til tilkoblet spiller. `player:join` med eksisterende frakoblet brukernavn behandles som rejoin; tilkoblet brukernavn gir "Brukernavnet er allerede tatt"
 - **questionStartedAt**: Settes på session ved spørsmålsstart, `null` under nedtelling — brukes til å beregne gjenstående tid ved rejoin
 - **speed_bonus per quiz**: Defineres i lobbyen av host, sendes med `host:start`, lagres i `session.speedBonus`
-- **Disconnect-håndtering**: Host-frakobling fryser quizen, spillere markeres `connected: false`
+- **Disconnect-håndtering**: Host-frakobling fryser quizen (fasen huskes i `statusBeforeFreeze`), spillere markeres `connected: false`. Merk: klienten kaller ikke `host:rejoin` ennå, så en host som refresher kan ikke ta opp igjen spillet
 - **JSON.parse av answers**: FormData sender alt som strings — `parsedAnswers` håndterer dette i PUT og POST
 - **Socket.io autentisering**: JWT sendes via `socket.handshake.auth.token`, host-hendelser krever rolle `host`/`admin`
 - **Rate limiting**: Login og register er rate-limited per IP
@@ -248,6 +253,17 @@ cd ~/Quizz_Prosjekt/server && pm2 restart quizz
 
 ---
 
+## Tester
+
+```bash
+cd server
+npm test
+```
+
+Testene i `server/test/` starter en ekte Socket.io-server med en falsk database og spiller gjennom spillet med ekte klienter. De dekker fasit-lekkasje, serverside tidtaking, host-rejoin, krasjsikring, fase-sperrer og romkoder. Ingen database trengs.
+
+---
+
 ## Neste steg
 
-Prosjektet er ferdig og i produksjon på https://gardh23.eu/quiz/
+Prosjektet er i produksjon på https://gardh23.eu/quiz/. Forbedringsrunde 2 (fase 1: sikkerhet og bugs) er gjort; neste er nye spørsmålstyper (sant/usant, tallestimat, rangering), deretter lyd/pall/svarfordeling og designoppussing.
