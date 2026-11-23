@@ -75,15 +75,35 @@ function speedPoints(timeUsed, allowedMs) {
     return Math.max(0, Math.min(1000, Math.round(1000 * (1 - timeUsed / allowedMs))))
 }
 
-function generateRoomCode() {
-    const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
-    const noun = nouns[Math.floor(Math.random() * nouns.length)]
-    return `${adj}-${noun}`
+function generateRoomCode(sessions) {
+    for (let attempt = 0; attempt < 50; attempt++) {
+        const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
+        const noun = nouns[Math.floor(Math.random() * nouns.length)]
+        const code = `${adj}-${noun}`
+        if (!sessions[code]) return code
+    }
+    return null
 }
 
 // answerGraceMs absorbs network latency for answers sent just as the timer hits 0.
-module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs = 1000 } = {}) {
+// Sessions live only in memory; idleMs drops rooms nobody has touched (abandoned lobbies, vanished hosts).
+module.exports = function (io, db = pool, {
+    countdownSeconds = 5,
+    answerGraceMs = 1000,
+    idleMs = 2 * 60 * 60 * 1000,
+    sweepMs = 10 * 60 * 1000
+} = {}) {
     const sessions = {}
+
+    setInterval(() => {
+        const now = Date.now()
+        for (const roomCode in sessions) {
+            if (now - sessions[roomCode].lastActivity > idleMs) {
+                console.log(`Økt ryddet bort (inaktiv): ${roomCode}`)
+                delete sessions[roomCode]
+            }
+        }
+    }, sweepMs).unref()
 
     io.on('connection', (socket) => {
         console.log('Bruker koblet til:', socket.id)
@@ -92,7 +112,11 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
         // every game in `sessions`. Payloads come from clients, so they may be missing.
         const on = (event, handler) => socket.on(event, async (payload) => {
             try {
-                await handler(payload && typeof payload === 'object' ? payload : {})
+                const data = payload && typeof payload === 'object' ? payload : {}
+                if (typeof data.roomCode === 'string' && sessions[data.roomCode]) {
+                    sessions[data.roomCode].lastActivity = Date.now()
+                }
+                await handler(data)
             } catch (err) {
                 console.error(`Feil i ${event}:`, err)
                 socket.emit('error', { message: 'Noe gikk galt' })
@@ -111,7 +135,11 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
                     return
                 }
 
-                const roomCode = generateRoomCode()
+                const roomCode = generateRoomCode(sessions)
+                if (!roomCode) {
+                    socket.emit('error', { message: 'Fant ingen ledig romkode, prøv igjen' })
+                    return
+                }
 
                 sessions[roomCode] = {
                     quizId,
@@ -119,7 +147,8 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
                     hostUserId: socket.user.id,
                     players: {},
                     status: 'waiting',
-                    currentQuestion: 0
+                    currentQuestion: 0,
+                    lastActivity: Date.now()
                 }
 
                 socket.join(roomCode)

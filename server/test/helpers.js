@@ -31,14 +31,14 @@ function fakeDb() {
 }
 
 // The real server verifies a JWT; tests pass the decoded user directly.
-async function startServer({ db = fakeDb(), countdownSeconds = 0, answerGraceMs = 0 } = {}) {
+async function startServer({ db = fakeDb(), countdownSeconds = 0, answerGraceMs = 0, idleMs, sweepMs } = {}) {
     const httpServer = http.createServer()
     const io = new Server(httpServer)
     io.use((socket, next) => {
         socket.user = socket.handshake.auth.user || null
         next()
     })
-    attachGame(io, db, { countdownSeconds, answerGraceMs })
+    attachGame(io, db, { countdownSeconds, answerGraceMs, idleMs, sweepMs })
     await new Promise(resolve => httpServer.listen(0, '127.0.0.1', resolve))
     const url = `http://127.0.0.1:${httpServer.address().port}`
     const clients = []
