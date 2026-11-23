@@ -26,7 +26,7 @@ En quiz-app som ligner Kahoot, med følgende særtrekk:
 - En **host** oppretter og styrer quizen live
 - **5–15 spillere** deltar samtidig via sanntidskommunikasjon (Socket.io)
 - Spørsmål lages **i forkant** og lagres i database
-- Støtte for **flervalg og fritekst i samme quiz**
+- Fem spørsmålstyper som kan blandes i samme quiz: **flervalg, fritekst, sant/usant, tallestimat og rangering**
 - Fritekst-svar vurderes **manuelt av host** live
 - Host kan **overstyre tidtakeren live**
 - **Hastighetsbonus** defineres per quiz i lobbyen (ikke per spørsmål)
@@ -81,7 +81,7 @@ Quizz/
 ```sql
 users         — id, username, password_hash, role (admin/host/player)
 quizzes       — id, title, created_by (FK users), created_at, speed_bonus (BOOLEAN)
-questions     — id, quiz_id (FK), type (multiple_choice/free_text), text,
+questions     — id, quiz_id (FK), type (multiple_choice/free_text/true_false/number_estimate/ranking), text,
                 time_limit, order_index, image_path, audio_path, image_width (INTEGER DEFAULT 100)
 answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 ```
@@ -89,6 +89,10 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 - `speed_bonus` ligger på quiz-nivå og settes i lobbyen
 - `image_width` er INTEGER 10–100, styrer visningsbredde i prosent
 - For fritekst lagres én answer-rad med fasit (is_correct = true)
+- Sant/usant lagres som to answer-rader, «Sant» og «Usant», der én er riktig — behandles som flervalg
+- Tallestimat lagrer riktig tall som tekst i én answer-rad
+- Rangering lagrer alternativene i riktig rekkefølge; rekkefølgen er `answers.id` (innsettingsrekkefølge), så alle spørringer sorterer på `id`
+- **Poeng for tallestimat og rangering**: presisjon 0–1 (tallestimat: 1 ved eksakt, 0 ved 50 % feil; rangering: andel på riktig plass). Uten hastighetsbonus gir presisjon ≥ 0,5 ett poeng, ellers 0. Med hastighetsbonus gir de `1000 × presisjon`, uten tidsfaktor
 
 ---
 
@@ -105,7 +109,7 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 
 ### Spiller sender:
 - `player:join` → blir med i rom; hvis samme brukernavn finnes og er frakoblet, behandles som rejoin
-- `player:answer` → sender svar (answerId, eller freeTextResponse for fritekst); fritekst kan sendes inn på nytt for å oppdatere. Svartiden måles av serveren
+- `player:answer` → sender svar: `answerId` (flervalg, sant/usant), `freeTextResponse` (fritekst — kan sendes inn på nytt), `numberResponse` (tallestimat) eller `ranking` (array av answer-id-er i spillerens rekkefølge). Svartiden måles av serveren. Rangeringsalternativer stokkes én gang ved start (`playerOrder`) så alle ser samme rekkefølge
 - `player:rejoin` → gjenkobler etter frakobling (kun hvis spilleren er markert frakoblet)
 
 ### Server sender til rom:
@@ -266,4 +270,4 @@ Testene i `server/test/` starter en ekte Socket.io-server med en falsk database 
 
 ## Neste steg
 
-Prosjektet er i produksjon på https://gardh23.eu/quiz/. Forbedringsrunde 2 (fase 1: sikkerhet og bugs) er gjort; neste er nye spørsmålstyper (sant/usant, tallestimat, rangering), deretter lyd/pall/svarfordeling og designoppussing.
+Prosjektet er i produksjon på https://gardh23.eu/quiz/. Forbedringsrunde 2: fase 1 (sikkerhet og bugs) og fase 2 (sant/usant, tallestimat, rangering) er gjort; neste er lyd/pall/svarfordeling, deretter designoppussing.
