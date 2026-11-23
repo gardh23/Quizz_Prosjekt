@@ -88,7 +88,18 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
     io.on('connection', (socket) => {
         console.log('Bruker koblet til:', socket.id)
 
-        socket.on('host:create', async ({ quizId }) => {
+        // A thrown error in a handler is uncaught and kills the process, and with it
+        // every game in `sessions`. Payloads come from clients, so they may be missing.
+        const on = (event, handler) => socket.on(event, async (payload) => {
+            try {
+                await handler(payload && typeof payload === 'object' ? payload : {})
+            } catch (err) {
+                console.error(`Feil i ${event}:`, err)
+                socket.emit('error', { message: 'Noe gikk galt' })
+            }
+        })
+
+        on('host:create', async ({ quizId }) => {
             if (!socket.user || (socket.user.role !== 'host' && socket.user.role !== 'admin')) {
                 socket.emit('error', { message: 'Ikke tilgang' })
                 return
@@ -120,7 +131,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
             }
         })
 
-        socket.on('player:join', ({ roomCode, username }) => {
+        on('player:join', ({ roomCode, username }) => {
             if (!username || typeof username !== 'string' || username.trim().length === 0 || username.length > 30) {
                 socket.emit('error', { message: 'Ugyldig brukernavn (maks 30 tegn)' })
                 return
@@ -173,7 +184,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
             console.log(`${username} joined ${roomCode}`)
         })
 
-        socket.on('host:start', async ({ roomCode, speedBonus }) => {
+        on('host:start', async ({ roomCode, speedBonus }) => {
             if (!socket.user || (socket.user.role !== 'host' && socket.user.role !== 'admin')) {
                 socket.emit('error', { message: 'Ikke tilgang' })
                 return
@@ -200,7 +211,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
             emitQuestion(io, roomCode, session, 'session:question', { question, index: 0, total: session.questions.length })
         })
 
-        socket.on('player:answer', ({ roomCode, answerId, freeTextResponse }) => {
+        on('player:answer', ({ roomCode, answerId, freeTextResponse }) => {
             const session = sessions[roomCode]
 
             if (!session || session.status !== 'active') {
@@ -266,7 +277,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
             io.to(roomCode).emit('session:players', { players: publicPlayers(session) })
         })
 
-        socket.on('host:next', ({ roomCode }) => {
+        on('host:next', ({ roomCode }) => {
             if (!socket.user || (socket.user.role !== 'host' && socket.user.role !== 'admin')) {
                 socket.emit('error', { message: 'Ikke tilgang' })
                 return
@@ -303,7 +314,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
             }, countdownSeconds * 1000)
         })
 
-        socket.on('host:grading_next', ({ roomCode }) => {
+        on('host:grading_next', ({ roomCode }) => {
             if (!socket.user || (socket.user.role !== 'host' && socket.user.role !== 'admin')) {
                 socket.emit('error', { message: 'Ikke tilgang' })
                 return
@@ -335,7 +346,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
             })
         })
 
-        socket.on('host:set_timer', ({ roomCode, seconds }) => {
+        on('host:set_timer', ({ roomCode, seconds }) => {
             if (!socket.user || (socket.user.role !== 'host' && socket.user.role !== 'admin')) {
                 socket.emit('error', { message: 'Ikke tilgang' })
                 return
@@ -358,7 +369,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
             io.to(roomCode).emit('session:timer_override', { seconds })
         })
 
-        socket.on('host:grade', ({ roomCode, playerId, isCorrect }) => {
+        on('host:grade', ({ roomCode, playerId, isCorrect }) => {
             if (!socket.user || (socket.user.role !== 'host' && socket.user.role !== 'admin')) {
                 socket.emit('error', { message: 'Ikke tilgang' })
                 return
@@ -374,7 +385,12 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
             if (!player) return
 
             const questionIndex = session.status === 'grading' ? session.gradingIndex : session.currentQuestion
-            const question = session.questions[questionIndex]
+            const question = session.questions?.[questionIndex]
+            if (!question || !player.answers[question.id]) {
+                socket.emit('error', { message: 'Spilleren har ikke svart på dette spørsmålet' })
+                return
+            }
+
             const points = isCorrect
                 ? session.speedBonus
                     ? speedPoints(player.answers[question.id].timeUsed, player.answers[question.id].allowedMs)
@@ -391,7 +407,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
         })
 
 
-        socket.on('disconnect', () => {
+        on('disconnect', () => {
             console.log('Bruker koblet fra:', socket.id)
 
             for (const roomCode in sessions) {
@@ -409,7 +425,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
             }
         })
 
-        socket.on('player:rejoin', ({ roomCode, username }) => {
+        on('player:rejoin', ({ roomCode, username }) => {
             const session = sessions[roomCode]
 
             if (!session) {
@@ -448,7 +464,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
             io.to(roomCode).emit('session:players', { players: publicPlayers(session) })
         })
 
-        socket.on('host:rejoin', ({ roomCode }) => {
+        on('host:rejoin', ({ roomCode }) => {
             const session = sessions[roomCode]
 
             if (!session) {
