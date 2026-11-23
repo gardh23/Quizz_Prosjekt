@@ -105,6 +105,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
                 sessions[roomCode] = {
                     quizId,
                     host: socket.id,
+                    hostUserId: socket.user.id,
                     players: {},
                     status: 'waiting',
                     currentQuestion: 0
@@ -398,6 +399,7 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
 
                 if (session.host === socket.id) {
                     session.host = null
+                    session.statusBeforeFreeze = session.status
                     session.status = 'frozen'
                     io.to(roomCode).emit('session:frozen', { message: 'Host koblet fra — venter på at host kobler til igjen' })
                 } else if (session.players[socket.id]) {
@@ -454,19 +456,38 @@ module.exports = function (io, db = pool, { countdownSeconds = 5, answerGraceMs 
                 return
             }
 
+            if (!socket.user || socket.user.id !== session.hostUserId) {
+                socket.emit('error', { message: 'Ikke tilgang' })
+                return
+            }
+
             if (session.host !== null) {
                 socket.emit('error', { message: 'En host er allerede tilkoblet' })
                 return
             }
 
             session.host = socket.id
-            session.status = 'active'
+            session.status = session.statusBeforeFreeze
 
             socket.join(roomCode)
+            socket.emit('host:rejoined', { roomCode, status: session.status })
+            socket.emit('session:players', { players: publicPlayers(session) })
 
-            const question = session.questions[session.currentQuestion]
-            socket.emit('host:rejoined', { roomCode })
-            emitQuestion(io, roomCode, session, 'session:resumed', { question, index: session.currentQuestion, total: session.questions.length })
+            if (session.status === 'grading') {
+                const question = session.questions[session.gradingIndex]
+                io.to(roomCode).emit('session:grading_question', {
+                    question,
+                    playerAnswers: buildPlayerAnswers(session, question),
+                    gradingIndex: session.gradingIndex,
+                    total: session.questions.length
+                })
+                return
+            }
+
+            const question = session.status === 'active' && session.questionStartedAt
+                ? session.questions[session.currentQuestion]
+                : null
+            emitQuestion(io, roomCode, session, 'session:resumed', { question, index: session.currentQuestion, total: session.questions?.length ?? 0 })
         })
 
 
