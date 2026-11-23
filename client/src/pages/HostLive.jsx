@@ -7,6 +7,7 @@ import AnswerDistribution from '../components/AnswerDistribution'
 import Podium from '../components/Podium'
 import { sounds, startLobbyMusic, stopLobbyMusic } from '../sound'
 import Timer from '../components/Timer'
+import ResultBadge from '../components/ResultBadge'
 
 function HostLive() {
     const { roomCode } = useParams()
@@ -249,13 +250,9 @@ function HostLive() {
                                         <div className="flex items-center gap-2">
                                             {!a.answered ? null
                                             : gradingQuestion.type !== 'free_text' ? (
-                                                <span className={`font-bold px-3 py-1 rounded-lg text-sm ${a.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                    {a.isCorrect ? `✓ ${a.points}p` : a.points > 0 ? `${a.points}p` : '✗'}
-                                                </span>
+                                                <ResultBadge answer={a} type={gradingQuestion.type} />
                                             ) : grade ? (
-                                                <span className={`font-bold px-3 py-1 rounded-lg text-sm ${grade.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                    {grade.isCorrect ? `✓ ${grade.points}p` : '✗'}
-                                                </span>
+                                                <ResultBadge answer={grade} type="free_text" />
                                             ) : (
                                                 <>
                                                     <button

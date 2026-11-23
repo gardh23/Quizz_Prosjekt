@@ -61,6 +61,8 @@ test('estimate without speed bonus: 1 point when at most 25% off, else 0', async
     const { byName } = await estimateGame({ ada: 8849, bob: 7000, cid: 5000 })
     assert.deepEqual([byName.ada.points, byName.ada.isCorrect, byName.ada.answerText], [1, true, '8849'])
     assert.deepEqual([byName.bob.points, byName.bob.isCorrect], [1, true])
+    // Grading shows how far off each guess was, not just a check mark.
+    assert.deepEqual([byName.ada.percentOff, byName.bob.percentOff, byName.cid.percentOff], [0, 21, 43])
     assert.deepEqual([byName.cid.points, byName.cid.isCorrect], [0, false])
 })
 
@@ -125,6 +127,9 @@ test('ranking without speed bonus: 1 point when at least half the positions are 
         cid: [32, 33, 34, 31]
     })
     assert.deepEqual([byName.ada.points, byName.ada.answerText], [1, 'Mus → Katt → Hest → Elefant'])
+    // Grading shows how many were in place, so a half-right order does not look fully right.
+    assert.deepEqual([byName.ada.correctPositions, byName.bob.correctPositions, byName.cid.correctPositions], [4, 2, 0])
+    assert.equal(byName.bob.totalPositions, 4)
     assert.equal(byName.bob.points, 1)
     assert.equal(byName.cid.points, 0)
 })

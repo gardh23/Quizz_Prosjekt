@@ -69,11 +69,11 @@ function buildPlayerAnswers(session, question) {
         const ans = player.answers[question.id]
         if (!ans) return { username: player.username, socketId, answered: false }
         if (question.type === 'number_estimate') {
-            return { username: player.username, socketId, answered: true, answerText: String(ans.numberResponse), isCorrect: ans.isCorrect, points: ans.points }
+            return { username: player.username, socketId, answered: true, answerText: String(ans.numberResponse), percentOff: ans.percentOff, isCorrect: ans.isCorrect, points: ans.points }
         }
         if (question.type === 'ranking') {
             const textOf = id => (question.answers || []).find(a => a && a.id === id)?.text ?? '?'
-            return { username: player.username, socketId, answered: true, answerText: ans.ranking.map(textOf).join(' → '), isCorrect: ans.isCorrect, points: ans.points }
+            return { username: player.username, socketId, answered: true, answerText: ans.ranking.map(textOf).join(' → '), correctPositions: ans.correctPositions, totalPositions: ans.totalPositions, isCorrect: ans.isCorrect, points: ans.points }
         }
         if (isChoice(question.type)) {
             const answerObj = (question.answers || []).find(a => a.id === ans.answerId)
@@ -386,8 +386,12 @@ module.exports = function (io, db = pool, {
                     socket.emit('error', { message: 'Ugyldig tall' })
                     return
                 }
-                const precision = estimatePrecision(numberResponse, parseNumber(question.answers?.[0]?.text))
+                const correct = parseNumber(question.answers?.[0]?.text)
+                const precision = estimatePrecision(numberResponse, correct)
                 record.numberResponse = numberResponse
+                record.percentOff = correct === 0
+                    ? (numberResponse === 0 ? 0 : 100)
+                    : Math.round(Math.abs(numberResponse - correct) / Math.abs(correct) * 100)
                 record.isCorrect = precision >= 0.5
                 record.points = precisionPoints(precision, session.speedBonus)
             } else if (question.type === 'ranking') {
@@ -396,7 +400,9 @@ module.exports = function (io, db = pool, {
                     socket.emit('error', { message: 'Ugyldig rekkefølge' })
                     return
                 }
-                const precision = ranking.filter((id, i) => id === correctIds[i]).length / correctIds.length
+                record.correctPositions = ranking.filter((id, i) => id === correctIds[i]).length
+                record.totalPositions = correctIds.length
+                const precision = record.correctPositions / record.totalPositions
                 record.ranking = ranking
                 record.isCorrect = precision >= 0.5
                 record.points = precisionPoints(precision, session.speedBonus)

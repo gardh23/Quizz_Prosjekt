@@ -6,6 +6,8 @@ import Podium from '../components/Podium'
 import { sounds, startLobbyMusic, stopLobbyMusic } from '../sound'
 import Timer from '../components/Timer'
 import AnswerLetter from '../components/AnswerLetter'
+import ResultBadge from '../components/ResultBadge'
+import YouBadge from '../components/YouBadge'
 
 function Play() {
     const [answered, setAnswered] = useState(false)
@@ -298,11 +300,12 @@ function Play() {
                         <AnswerDistribution distribution={gradingDistribution} />
                         <div className="flex flex-col gap-2 mt-3">
                             {gradingPlayerAnswers.map(a => (
-                                <div key={a.username} className={`flex items-center justify-between rounded-xl px-4 py-3 ${a.username === usernameRef.current ? 'bg-purple-100' : 'bg-purple-50'}`}>
+                                <div key={a.username} className={`flex items-center justify-between gap-3 rounded-xl px-4 py-3 ${a.username === username ? 'bg-purple-100 ring-2 ring-purple-500' : 'bg-purple-50'}`}>
                                     <div>
                                         <span className="font-semibold text-purple-900">{a.username}</span>
+                                        {a.username === username && <YouBadge />}
                                         {!a.answered ? (
-                                            <span className="text-gray-400 text-sm ml-2">Ikke svart</span>
+                                            <span className="text-gray-500 text-sm ml-2">Ikke svart</span>
                                         ) : gradingQuestion.type !== 'free_text' ? (
                                             <span className="text-gray-700 text-sm ml-2">{a.answerText}</span>
                                         ) : (
@@ -310,9 +313,7 @@ function Play() {
                                         )}
                                     </div>
                                     {a.answered && (gradingQuestion.type !== 'free_text' || a.graded) && (
-                                        <span className={`font-bold px-3 py-1 rounded-lg text-sm ${a.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                            {a.isCorrect ? `✓ ${a.points}p` : a.points > 0 ? `${a.points}p` : '✗'}
-                                        </span>
+                                        <ResultBadge answer={a} type={gradingQuestion.type} />
                                     )}
                                 </div>
                             ))}

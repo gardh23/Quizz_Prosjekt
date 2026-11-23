@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import confetti from 'canvas-confetti'
 import { sounds } from '../sound'
+import YouBadge from './YouBadge'
 
 const places = {
     1: { height: 'h-44', medal: '🥇', color: 'bg-yellow-400' },
@@ -43,8 +44,9 @@ function Podium({ leaderboard, me = null }) {
                         <div key={place} className="flex flex-col items-center w-28">
                             <div className={`mb-2 text-center transition-opacity duration-500 ${shown ? 'opacity-100' : 'opacity-0'}`}>
                                 {group.map(p => (
-                                    <p key={p.username} className={`font-bold leading-tight break-words ${p.username === me ? 'text-purple-600 underline' : 'text-purple-900'}`}>
+                                    <p key={p.username} className="font-bold leading-tight break-words text-purple-900">
                                         {p.username}
+                                        {p.username === me && <YouBadge />}
                                     </p>
                                 ))}
                                 <p className="text-sm text-gray-500">{group[0].score} poeng</p>
@@ -59,8 +61,8 @@ function Podium({ leaderboard, me = null }) {
             {rest.length > 0 && (
                 <div className="flex flex-col gap-2">
                     {rest.map(p => (
-                        <div key={p.username} className={`flex items-center justify-between rounded-xl px-5 py-3 ${p.username === me ? 'bg-purple-200' : 'bg-purple-50'}`}>
-                            <span className="font-bold text-purple-900">#{p.rank} {p.username}</span>
+                        <div key={p.username} className={`flex items-center justify-between rounded-xl px-5 py-3 ${p.username === me ? 'bg-purple-100 ring-2 ring-purple-500' : 'bg-purple-50'}`}>
+                            <span className="font-bold text-purple-900">#{p.rank} {p.username}{p.username === me && <YouBadge />}</span>
                             <span className="text-purple-600 font-bold">{p.score} poeng</span>
                         </div>
                     ))}
