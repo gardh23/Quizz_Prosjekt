@@ -2,6 +2,17 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api, { mediaBase } from '../api'
 import TopBar from '../components/TopBar'
+import FilePicker from '../components/FilePicker'
+
+const typeLabels = {
+    multiple_choice: 'Flervalg',
+    free_text: 'Fritekst',
+    true_false: 'Sant/usant',
+    number_estimate: 'Tallestimat',
+    ranking: 'Rangering'
+}
+
+const labelClass = 'text-sm font-semibold text-gray-600'
 
 const emptyAnswers = [
     { text: '', is_correct: false },
@@ -111,8 +122,8 @@ function QuizEditor() {
     }, [id])
 
     if (!quiz) return (
-        <div className="min-h-screen bg-purple-900 flex items-center justify-center">
-            <p className="text-white text-2xl">Laster...</p>
+        <div className="min-h-screen bg-purple-900 flex items-center justify-center" role="status" aria-label="Laster quiz">
+            <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full motion-safe:animate-spin" />
         </div>
     )
 
@@ -146,11 +157,18 @@ function QuizEditor() {
 
                 <div className="mb-8">
                     <h2 className="text-xl font-bold text-purple-200 mb-3">Spørsmål ({quiz.questions.length})</h2>
-                    {quiz.questions.length === 0 && <p className="text-purple-400">Ingen spørsmål ennå</p>}
+                    {quiz.questions.length === 0 && (
+                        <p className="text-purple-200 text-center py-8 border-2 border-dashed border-purple-500 rounded-2xl">
+                            Ingen spørsmål ennå — legg til det første under ↓
+                        </p>
+                    )}
                     <div className="flex flex-col gap-3">
                         {quiz.questions.map((q, i) => (
-                            <div key={q.id} className={`bg-white rounded-2xl px-5 py-4 flex items-center justify-between shadow-lg ${editingQuestion?.id === q.id ? 'ring-2 ring-purple-500' : ''}`}>
-                                <p className="text-purple-900 font-semibold">{i + 1}. {q.text}</p>
+                            <div key={q.id} className={`bg-white rounded-2xl px-5 py-4 flex items-center justify-between gap-4 shadow-lg ${editingQuestion?.id === q.id ? 'ring-2 ring-purple-500' : ''}`}>
+                                <p className="text-purple-900 font-semibold">
+                                    {i + 1}. <span className="text-xs font-bold bg-purple-100 text-purple-700 rounded px-2 py-0.5 mr-2 align-middle">{typeLabels[q.type] || q.type}</span>
+                                    {q.text}
+                                </p>
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => startEdit(q)}
@@ -175,81 +193,100 @@ function QuizEditor() {
                         {editingQuestion ? 'Rediger spørsmål' : 'Legg til spørsmål'}
                     </h2>
                     <form onSubmit={submitQuestion} className="flex flex-col gap-4">
-                        <select
-                            value={type}
-                            onChange={e => {
-                                setType(e.target.value)
-                                setAnswers(defaultAnswers(e.target.value))
-                            }}
-                            className="field"
+                        <div className="grid grid-cols-[1fr_9rem] gap-3">
+                            <label className="flex flex-col gap-1">
+                                <span className={labelClass}>Type</span>
+                                <select
+                                    value={type}
+                                    onChange={e => {
+                                        setType(e.target.value)
+                                        setAnswers(defaultAnswers(e.target.value))
+                                    }}
+                                    className="field"
+                                >
+                                    {Object.entries(typeLabels).map(([value, label]) => (
+                                        <option key={value} value={value}>{label}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="flex flex-col gap-1">
+                                <span className={labelClass}>Tid</span>
+                                <span className="relative">
+                                    <input
+                                        type="number"
+                                        min="5"
+                                        value={timeLimit}
+                                        onChange={e => setTimeLimit(e.target.value)}
+                                        className="field w-full pr-12"
+                                    />
+                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">sek</span>
+                                </span>
+                            </label>
+                        </div>
+
+                        <label className="flex flex-col gap-1">
+                            <span className={labelClass}>Spørsmål</span>
+                            <input
+                                value={text}
+                                onChange={e => setText(e.target.value)}
+                                placeholder="F.eks. Hva er hovedstaden i Australia?"
+                                className="field"
+                            />
+                        </label>
+
+                        <details
+                            open={!!(imageFile || audioFile || editingQuestion?.image_path || editingQuestion?.audio_path)}
+                            className="rounded-xl border-2 border-gray-100 px-4 py-3"
                         >
-                            <option value="multiple_choice">Flervalg</option>
-                            <option value="free_text">Fritekst</option>
-                            <option value="true_false">Sant/usant</option>
-                            <option value="number_estimate">Tallestimat</option>
-                            <option value="ranking">Rangering</option>
-                        </select>
-
-                        <input
-                            value={text}
-                            onChange={e => setText(e.target.value)}
-                            placeholder="Spørsmålstekst"
-                            className="field"
-                        />
-
-                        <input
-                            type="number"
-                            value={timeLimit}
-                            onChange={e => setTimeLimit(e.target.value)}
-                            placeholder="Tidsbegrensning (sekunder)"
-                            className="field"
-                        />
-
-                        <div className="flex flex-col gap-2">
-                            <label className="text-gray-600 font-semibold">Bilde (jpg/png)</label>
-                            <input
-                                type="file"
-                                accept="image/jpeg,image/png"
-                                onChange={e => setImageFile(e.target.files[0] || null)}
-                                className="border-2 border-gray-200 rounded-xl p-2 text-gray-600"
-                            />
-                            {(imageFile || editingQuestion?.image_path) && (
-                                <div className="mt-2 p-4 bg-purple-50 rounded-xl">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <label className="text-sm font-semibold text-gray-600">Størrelse: {imageWidth}%</label>
-                                        <input
-                                            type="range"
-                                            min="10"
-                                            max="100"
-                                            value={imageWidth}
-                                            onChange={e => setImageWidth(parseInt(e.target.value))}
-                                            className="w-40 accent-purple-600"
-                                        />
-                                    </div>
-                                    <div className="bg-purple-800 rounded-xl p-4 text-center">
-                                        <p className="text-purple-200 text-sm mb-2">Forhåndsvisning</p>
-                                        <img
-                                            src={imageFile ? URL.createObjectURL(imageFile) : `${mediaBase}/${editingQuestion.image_path}`}
-                                            style={{ width: `${imageWidth}%` }}
-                                            className="mx-auto rounded-xl object-contain"
-                                        />
-                                    </div>
+                            <summary className="cursor-pointer font-semibold text-gray-600">Bilde og lyd (valgfritt)</summary>
+                            <div className="flex flex-col gap-4 mt-4">
+                                <div className="flex flex-col gap-2">
+                                    <span className={labelClass}>Bilde (jpg/png)</span>
+                                    <FilePicker
+                                        accept="image/jpeg,image/png"
+                                        label="Velg bilde …"
+                                        file={imageFile}
+                                        onChange={setImageFile}
+                                    />
+                                    {(imageFile || editingQuestion?.image_path) && (
+                                        <div className="mt-2 p-4 bg-purple-50 rounded-xl">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="text-sm font-semibold text-gray-600">Størrelse: {imageWidth}%</label>
+                                                <input
+                                                    type="range"
+                                                    min="10"
+                                                    max="100"
+                                                    value={imageWidth}
+                                                    onChange={e => setImageWidth(parseInt(e.target.value))}
+                                                    className="w-40 accent-purple-600"
+                                                />
+                                            </div>
+                                            <div className="bg-purple-800 rounded-xl p-4 text-center">
+                                                <p className="text-purple-200 text-sm mb-2">Forhåndsvisning</p>
+                                                <img
+                                                    src={imageFile ? URL.createObjectURL(imageFile) : `${mediaBase}/${editingQuestion.image_path}`}
+                                                    style={{ width: `${imageWidth}%` }}
+                                                    className="mx-auto rounded-xl object-contain"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
 
-                        <div className="flex flex-col gap-2">
-                            <label className="text-gray-600 font-semibold">Lydfil (mp3)</label>
-                            {editingQuestion?.audio_path && !audioFile && (
-                                <audio controls src={`${mediaBase}/${editingQuestion.audio_path}`} className="w-full mb-1" />
-                            )}
-                            <input
-                                type="file"
-                                accept="audio/mpeg"
-                                onChange={e => setAudioFile(e.target.files[0] || null)}
-                                className="border-2 border-gray-200 rounded-xl p-2 text-gray-600"
-                            />
-                        </div>
+                                <div className="flex flex-col gap-2">
+                                    <span className={labelClass}>Lydfil (mp3)</span>
+                                    {editingQuestion?.audio_path && !audioFile && (
+                                        <audio controls src={`${mediaBase}/${editingQuestion.audio_path}`} className="w-full mb-1" />
+                                    )}
+                                    <FilePicker
+                                        accept="audio/mpeg"
+                                        label="Velg lydfil …"
+                                        file={audioFile}
+                                        onChange={setAudioFile}
+                                    />
+                                </div>
+                            </div>
+                        </details>
 
                         {type === 'multiple_choice' && answers.map((answer, i) => (
                             <div key={i} className="flex items-center gap-3">

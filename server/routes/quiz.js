@@ -23,7 +23,7 @@ router.post('/', requireAuth, requireRole('host', 'admin'), async (req, res) => 
 router.get('/', requireAuth, async (req, res) => {
     try {
         const result = await pool.query(
-            'SELECT quizzes.*, users.username as created_by_username FROM quizzes JOIN users ON quizzes.created_by = users.id ORDER BY created_at DESC'
+            'SELECT quizzes.*, users.username as created_by_username, (SELECT COUNT(*) FROM questions WHERE questions.quiz_id = quizzes.id)::int AS question_count FROM quizzes JOIN users ON quizzes.created_by = users.id ORDER BY created_at DESC'
         )
         res.json(result.rows)
     } catch (err) {

@@ -54,13 +54,22 @@ function Host() {
                     </button>
                 </form>
 
-                {quizzes.length === 0 && <p className="text-purple-300 text-center">Ingen quizer ennå</p>}
+                {quizzes.length === 0 && (
+                    <p className="text-purple-200 text-center py-8 border-2 border-dashed border-purple-500 rounded-2xl">
+                        Ingen quizer ennå — lag den første over ↑
+                    </p>
+                )}
                 <div className="flex flex-col gap-4">
-                    {quizzes.map(quiz => (
-                        <div key={quiz.id} className="bg-white rounded-2xl p-5 flex items-center justify-between shadow-lg">
+                    {quizzes.map(quiz => {
+                        // A quiz created in this session has no count from the server yet.
+                        const count = quiz.question_count ?? 0
+                        return (
+                        <div key={quiz.id} className="bg-white rounded-2xl p-5 flex items-center justify-between gap-4 shadow-lg">
                             <div>
                                 <h3 className="text-xl font-bold text-purple-900">{quiz.title}</h3>
-                                <p className="text-gray-400 text-sm">Laget av: {quiz.created_by_username}</p>
+                                <p className="text-gray-500 text-sm">
+                                    Laget av {quiz.created_by_username} · {count === 1 ? '1 spørsmål' : `${count} spørsmål`}
+                                </p>
                             </div>
                             <div className="flex gap-2">
                                 <button
@@ -71,6 +80,8 @@ function Host() {
                                 </button>
                                 <button
                                     onClick={() => startQuiz(quiz.id)}
+                                    disabled={count === 0}
+                                    title={count === 0 ? 'Legg til spørsmål først' : undefined}
                                     className="btn btn-go px-4 py-2"
                                 >
                                     Start
@@ -83,7 +94,8 @@ function Host() {
                                 </button>
                             </div>
                         </div>
-                    ))}
+                        )
+                    })}
                 </div>
             </div>
         </div>

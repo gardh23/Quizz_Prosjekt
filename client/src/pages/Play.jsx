@@ -503,11 +503,14 @@ function Play() {
             <div className="min-h-screen bg-purple-900 flex items-center justify-center">
                 <div className="bg-white rounded-2xl p-10 text-center shadow-2xl w-full max-w-md">
                     <h1 className="text-3xl font-bold text-purple-900 mb-2">Venter på host...</h1>
-                    <p className="text-gray-500 mb-6">Rom: <span className="font-bold text-purple-600">{roomCode}</span></p>
-                    <h2 className="text-xl font-bold text-gray-700 mb-3">Spillere ({players.length})</h2>
-                    <div className="flex flex-col gap-2">
+                    <p className="text-gray-500">Du er med som <span className="font-bold text-purple-900">{username}</span></p>
+                    <p className="text-gray-500 mb-6">i rom <span className="font-bold font-mono tracking-wider text-purple-900">{roomCode}</span></p>
+                    <h2 className="text-sm uppercase tracking-widest font-semibold text-gray-500 mb-3">Spillere ({players.length})</h2>
+                    <div className="flex flex-wrap justify-center gap-2">
                         {players.map(p => (
-                            <p key={p.username} className="bg-purple-100 text-purple-800 font-semibold py-2 rounded-lg motion-safe:animate-pop">{p.username}</p>
+                            <span key={p.username} className={`font-semibold px-4 py-2 rounded-full motion-safe:animate-pop ${p.username === username ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-800'}`}>
+                                {p.username}{p.username === username && ' (deg)'}
+                            </span>
                         ))}
                     </div>
                 </div>
@@ -521,18 +524,26 @@ function Play() {
                 <h1 className="text-4xl font-bold text-center text-purple-900 mb-8">Bli med i quiz</h1>
                 {error && <p role="alert" className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-center motion-safe:animate-rise">{error}</p>}
                 <form onSubmit={join} className="flex flex-col gap-4">
-                    <input
-                        value={roomCode}
-                        onChange={e => setRoomCode(e.target.value)}
-                        placeholder="f.eks. glad-hest"
-                        className="field text-center"
-                    />
-                    <input
-                        value={username}
-                        onChange={e => setUsername(e.target.value)}
-                        placeholder="Brukernavn"
-                        className="field"
-                    />
+                    <label className="flex flex-col gap-1">
+                        <span className="text-sm font-semibold text-gray-600">Romkode</span>
+                        <input
+                            value={roomCode}
+                            onChange={e => setRoomCode(e.target.value)}
+                            placeholder="f.eks. glad-hest"
+                            className="field text-center text-2xl font-bold uppercase tracking-widest placeholder:normal-case placeholder:tracking-normal placeholder:font-normal"
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                        <span className="text-sm font-semibold text-gray-600">Ditt navn</span>
+                        <input
+                            value={username}
+                            onChange={e => setUsername(e.target.value)}
+                            placeholder="Brukernavn"
+                            autoFocus={!!roomCode}
+                            maxLength={30}
+                            className="field text-center"
+                        />
+                    </label>
                     <button
                         type="submit"
                         className="btn btn-go btn-lg"
