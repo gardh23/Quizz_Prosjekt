@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import confetti from 'canvas-confetti'
+import { sounds } from '../sound'
 
 const places = {
     1: { height: 'h-44', medal: '🥇', color: 'bg-yellow-400' },
@@ -26,6 +27,7 @@ function Podium({ leaderboard, me = null }) {
     useEffect(() => {
         if (steps > 0 && revealed === steps) {
             confetti({ particleCount: 160, spread: 90, origin: { y: 0.6 }, disableForReducedMotion: true })
+            sounds.fanfare()
         }
     }, [revealed, steps])
 

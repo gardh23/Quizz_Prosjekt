@@ -5,6 +5,7 @@ import UserBadge from '../components/UserBadge'
 import { mediaBase } from '../api'
 import AnswerDistribution from '../components/AnswerDistribution'
 import Podium from '../components/Podium'
+import { sounds, startLobbyMusic, stopLobbyMusic } from '../sound'
 
 function HostLive() {
     const { roomCode } = useParams()
@@ -120,6 +121,24 @@ function HostLive() {
             if (countdownRef.current) clearInterval(countdownRef.current)
         }
     }, [roomCode, navigate])
+
+    const inLobby = phase === 'waiting' && !question && countdownLeft === null && !finished
+    useEffect(() => {
+        if (!inLobby) return
+        startLobbyMusic()
+        return stopLobbyMusic
+    }, [inLobby])
+
+    useEffect(() => {
+        if (countdownLeft > 0) sounds.tick()
+    }, [countdownLeft])
+
+    const questionOpen = !!question
+    useEffect(() => {
+        if (!questionOpen || timeLeft === null) return
+        if (timeLeft > 0 && timeLeft <= 5) sounds.tick()
+        if (timeLeft === 0) sounds.timeUp()
+    }, [timeLeft, questionOpen])
 
     const next = () => {
         socket.emit('host:next', { roomCode })

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { mediaBase } from '../api'
 import AnswerDistribution from '../components/AnswerDistribution'
 import Podium from '../components/Podium'
+import { sounds, startLobbyMusic, stopLobbyMusic } from '../sound'
 
 function Play() {
     const [answered, setAnswered] = useState(false)
@@ -122,6 +123,7 @@ function Play() {
             if (resumed) startTimer(timeRemaining)
         })
         socket.on('player:answer_result', () => {
+            sounds.submitted()
             setAnswered(true)
             setConfirmFlash(true)
             setTimeout(() => setConfirmFlash(false), 2000)
@@ -139,6 +141,12 @@ function Play() {
             }, 1000)
         })
         socket.on('session:grading_question', ({ question, playerAnswers, distribution, gradingIndex, total }) => {
+            // Free text waits for the host's verdict (session:answer_graded); the rest is decided already.
+            const mine = playerAnswers.find(a => a.username === usernameRef.current)
+            if (mine?.answered && question.type !== 'free_text') {
+                if (mine.isCorrect || mine.points > 0) sounds.correct()
+                else sounds.wrong()
+            }
             setGradingDistribution(distribution)
             setGradingQuestion(question)
             setGradingPlayerAnswers(playerAnswers)
@@ -149,6 +157,10 @@ function Play() {
             if (countdownRef.current) clearInterval(countdownRef.current)
         })
         socket.on('session:answer_graded', ({ username, isCorrect, points }) => {
+            if (username === usernameRef.current) {
+                if (isCorrect) sounds.correct()
+                else sounds.wrong()
+            }
             setGradingPlayerAnswers(prev => prev.map(a =>
                 a.username === username ? { ...a, isCorrect, points, graded: true } : a
             ))
@@ -183,6 +195,24 @@ function Play() {
             if (countdownRef.current) clearInterval(countdownRef.current)
         }
     }, [])
+
+    const inLobby = joined && !question && countdownLeft === null && !gradingQuestion && !finished && !frozen
+    useEffect(() => {
+        if (!inLobby) return
+        startLobbyMusic()
+        return stopLobbyMusic
+    }, [inLobby])
+
+    useEffect(() => {
+        if (countdownLeft > 0) sounds.tick()
+    }, [countdownLeft])
+
+    const questionOpen = !!question
+    useEffect(() => {
+        if (!questionOpen || timeLeft === null) return
+        if (timeLeft > 0 && timeLeft <= 5) sounds.tick()
+        if (timeLeft === 0) sounds.timeUp()
+    }, [timeLeft, questionOpen])
 
     const answerColors = [
         'bg-red-500 hover:bg-red-600',

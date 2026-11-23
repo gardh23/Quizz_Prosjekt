@@ -5,6 +5,7 @@ import Play from './pages/Play'
 import Login from './pages/Login'
 import Host from './pages/Host'
 import Admin from './pages/Admin'
+import MuteButton from './components/MuteButton'
 
 function Home() {
   const user = JSON.parse(localStorage.getItem('user'))
@@ -21,8 +22,8 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/host" element={<Host />} />
         <Route path="/quiz/:id/edit" element={<QuizEditor />} />
-        <Route path="/play" element={<Play />} /> 
-        <Route path="/host/live/:roomCode" element={<HostLive />} />
+        <Route path="/play" element={<><Play /><MuteButton /></>} />
+        <Route path="/host/live/:roomCode" element={<><HostLive /><MuteButton /></>} />
         <Route path="/admin" element={<Admin />} /> 
       </Routes>
     </BrowserRouter>
