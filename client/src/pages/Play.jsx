@@ -49,6 +49,8 @@ function Play() {
     const [gradingQuestion, setGradingQuestion] = useState(null)
     const [gradingPlayerAnswers, setGradingPlayerAnswers] = useState([])
     const [gradingDistribution, setGradingDistribution] = useState(null)
+    const [gradingRevealed, setGradingRevealed] = useState(false)
+    const revealSoundRef = useRef(null)
     const [gradingIndex, setGradingIndex] = useState(0)
     const [gradingTotal, setGradingTotal] = useState(0)
 
@@ -147,13 +149,17 @@ function Play() {
                 })
             }, 1000)
         })
-        socket.on('session:grading_question', ({ question, playerAnswers, distribution, gradingIndex, total }) => {
-            // Free text waits for the host's verdict (session:answer_graded); the rest is decided already.
+        socket.on('session:grading_question', ({ question, playerAnswers, distribution, revealed, gradingIndex, total }) => {
+            // The view is resent whenever the host changes points; only the reveal itself plays a sound.
             const mine = playerAnswers.find(a => a.username === usernameRef.current)
-            if (mine?.answered && question.type !== 'free_text') {
-                if (mine.isCorrect || mine.points > 0) sounds.correct()
-                else sounds.wrong()
+            if (revealed && revealSoundRef.current !== question.id) {
+                revealSoundRef.current = question.id
+                if (mine?.answered && (question.type !== 'free_text' || mine.graded)) {
+                    if (mine.points > 0) sounds.correct()
+                    else sounds.wrong()
+                }
             }
+            setGradingRevealed(revealed)
             setGradingDistribution(distribution)
             setGradingQuestion(question)
             setGradingPlayerAnswers(playerAnswers)
@@ -162,15 +168,6 @@ function Play() {
             setQuestion(null)
             setCountdownLeft(null)
             if (countdownRef.current) clearInterval(countdownRef.current)
-        })
-        socket.on('session:answer_graded', ({ username, isCorrect, points }) => {
-            if (username === usernameRef.current) {
-                if (isCorrect) sounds.correct()
-                else sounds.wrong()
-            }
-            setGradingPlayerAnswers(prev => prev.map(a =>
-                a.username === username ? { ...a, isCorrect, points, graded: true } : a
-            ))
         })
         socket.on('session:finished', ({ leaderboard }) => {
             const me = leaderboard.find(p => p.username === usernameRef.current)
@@ -196,7 +193,6 @@ function Play() {
             socket.off('player:answer_result')
             socket.off('session:countdown')
             socket.off('session:grading_question')
-            socket.off('session:answer_graded')
             socket.off('session:finished')
             if (timerRef.current) clearInterval(timerRef.current)
             if (countdownRef.current) clearInterval(countdownRef.current)
@@ -280,7 +276,7 @@ function Play() {
                     </h1>
                     <div key={gradingQuestion.id} className="bg-white rounded-2xl p-6 shadow-lg motion-safe:animate-rise">
                         <h2 className="text-xl font-bold text-purple-900 mb-2">{gradingQuestion.text}</h2>
-                        {correctAnswers.length > 0 && (
+                        {gradingRevealed && correctAnswers.length > 0 && (
                             <div className="flex flex-wrap gap-2 mb-3">
                                 {correctAnswers.map(a => (
                                     <span key={a.id} className="bg-green-100 text-green-700 font-semibold px-3 py-1 rounded-lg text-sm">
@@ -299,6 +295,11 @@ function Play() {
                         {gradingQuestion.audio_path && (
                             <audio key={gradingQuestion.id} controls src={`${mediaBase}/${gradingQuestion.audio_path}`} className="w-full mb-3" />
                         )}
+                        {!gradingRevealed && (
+                            <p className="text-sm font-semibold text-purple-800 bg-purple-50 rounded-lg px-3 py-2 mb-2" aria-live="polite">
+                                🔒 Venter på at hosten viser svaret …
+                            </p>
+                        )}
                         <AnswerDistribution distribution={gradingDistribution} />
                         <div className="flex flex-col gap-2 mt-3">
                             {gradingPlayerAnswers.map(a => (
@@ -314,7 +315,7 @@ function Play() {
                                             <span className="text-gray-700 text-sm ml-2">"{a.freeTextResponse}"</span>
                                         )}
                                     </div>
-                                    {a.answered && (gradingQuestion.type !== 'free_text' || a.graded) && (
+                                    {gradingRevealed && a.answered && (gradingQuestion.type !== 'free_text' || a.graded) && (
                                         <ResultBadge answer={a} type={gradingQuestion.type} />
                                     )}
                                 </div>

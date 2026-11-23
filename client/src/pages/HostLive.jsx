@@ -8,6 +8,8 @@ import Podium from '../components/Podium'
 import { sounds, startLobbyMusic, stopLobbyMusic } from '../sound'
 import Timer from '../components/Timer'
 import ResultBadge from '../components/ResultBadge'
+import PointsStepper from '../components/PointsStepper'
+import EndQuizButton from '../components/EndQuizButton'
 
 function HostLive() {
     const { roomCode } = useParams()
@@ -33,7 +35,7 @@ function HostLive() {
     const [gradingDistribution, setGradingDistribution] = useState(null)
     const [gradingIndex, setGradingIndex] = useState(0)
     const [gradingTotal, setGradingTotal] = useState(0)
-    const [localGrades, setLocalGrades] = useState({})
+    const [gradingRevealed, setGradingRevealed] = useState(false)
 
     const startTimer = (seconds) => {
         if (timerRef.current) clearInterval(timerRef.current)
@@ -85,19 +87,17 @@ function HostLive() {
                 })
             }, 1000)
         })
-        socket.on('session:grading_question', ({ question, playerAnswers, distribution, gradingIndex, total }) => {
+        // Resent after every grade or point change, so it is the single source for the rows.
+        socket.on('session:grading_question', ({ question, playerAnswers, distribution, revealed, gradingIndex, total }) => {
             setGradingDistribution(distribution)
             setPhase('grading')
             setGradingQuestion(question)
             setGradingPlayerAnswers(playerAnswers)
+            setGradingRevealed(revealed)
             setGradingIndex(gradingIndex)
             setGradingTotal(total)
-            setLocalGrades({})
             setQuestion(null)
             setCountdownLeft(null)
-        })
-        socket.on('session:answer_graded', ({ username, isCorrect, points }) => {
-            setLocalGrades(prev => ({ ...prev, [username]: { isCorrect, points } }))
         })
         socket.on('session:finished', ({ leaderboard }) => {
             setLeaderboard(leaderboard)
@@ -117,7 +117,6 @@ function HostLive() {
             socket.off('session:question')
             socket.off('session:countdown')
             socket.off('session:grading_question')
-            socket.off('session:answer_graded')
             socket.off('session:finished')
             socket.off('host:free_text_answer')
             if (timerRef.current) clearInterval(timerRef.current)
@@ -157,6 +156,8 @@ function HostLive() {
         if (timeLeft > 0 && timeLeft <= 5) sounds.tick()
         if (timeLeft === 0) sounds.timeUp()
     }, [timeLeft, questionOpen])
+
+    const endQuiz = () => socket.emit('host:end', { roomCode })
 
     const next = () => {
         socket.emit('host:next', { roomCode })
@@ -202,12 +203,15 @@ function HostLive() {
             <div className="min-h-screen bg-purple-900 p-8">
                 <TopBar />
                 <div className="max-w-2xl mx-auto">
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center justify-between mb-2">
                         <h1 className="text-2xl font-bold text-white">
                             Rettefase — <span className="text-yellow-300">{gradingIndex + 1} / {gradingTotal}</span>
                         </h1>
                         <span className="bg-purple-700 text-purple-200 px-4 py-2 rounded-xl">{players.length} spillere</span>
                     </div>
+                    <p className="text-sm font-semibold mb-4 text-purple-200" aria-live="polite">
+                        {gradingRevealed ? '👁 Svaret er vist for spillerne' : '🔒 Spillerne ser bare svarene, ikke fasit eller poeng'}
+                    </p>
 
                     <div key={gradingQuestion.id} className="bg-white rounded-2xl p-6 mb-4 shadow-lg motion-safe:animate-rise">
                         <h2 className="text-xl font-bold text-purple-900 mb-2">{gradingQuestion.text}</h2>
@@ -234,54 +238,68 @@ function HostLive() {
                         <AnswerDistribution distribution={gradingDistribution} />
                         <div className="flex flex-col gap-2 mt-3">
                             {gradingPlayerAnswers.map(a => {
-                                const grade = localGrades[a.username]
+                                const awaitingVerdict = gradingQuestion.type === 'free_text' && !a.graded
                                 return (
-                                    <div key={a.username} className="flex items-center justify-between bg-purple-50 rounded-xl px-4 py-3">
-                                        <div>
+                                    <div key={a.username} className="flex flex-wrap items-center justify-between gap-3 bg-purple-50 rounded-xl px-4 py-3">
+                                        <div className="min-w-0">
                                             <span className="font-semibold text-purple-900">{a.username}</span>
                                             {!a.answered ? (
-                                                <span className="text-gray-400 text-sm ml-2">Ikke svart</span>
+                                                <span className="text-gray-500 text-sm ml-2">Ikke svart</span>
                                             ) : gradingQuestion.type !== 'free_text' ? (
                                                 <span className="text-gray-700 text-sm ml-2">{a.answerText}</span>
                                             ) : (
                                                 <span className="text-gray-700 text-sm ml-2">"{a.freeTextResponse}"</span>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            {!a.answered ? null
-                                            : gradingQuestion.type !== 'free_text' ? (
-                                                <ResultBadge answer={a} type={gradingQuestion.type} />
-                                            ) : grade ? (
-                                                <ResultBadge answer={grade} type="free_text" />
-                                            ) : (
-                                                <>
-                                                    <button
-                                                        onClick={() => socket.emit('host:grade', { roomCode, playerId: a.socketId, isCorrect: true })}
-                                                        className="btn btn-go px-3 py-1 rounded-lg text-sm"
-                                                    >
-                                                        Riktig
-                                                    </button>
-                                                    <button
-                                                        onClick={() => socket.emit('host:grade', { roomCode, playerId: a.socketId, isCorrect: false })}
-                                                        className="btn btn-danger px-3 py-1 rounded-lg text-sm"
-                                                    >
-                                                        Feil
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
+                                        {a.answered && (
+                                            <div className="flex items-center gap-3">
+                                                {awaitingVerdict ? (
+                                                    <>
+                                                        <button
+                                                            onClick={() => socket.emit('host:grade', { roomCode, playerId: a.socketId, isCorrect: true })}
+                                                            className="btn btn-go px-3 py-1 rounded-lg text-sm"
+                                                        >
+                                                            Riktig
+                                                        </button>
+                                                        <button
+                                                            onClick={() => socket.emit('host:grade', { roomCode, playerId: a.socketId, isCorrect: false })}
+                                                            className="btn btn-danger px-3 py-1 rounded-lg text-sm"
+                                                        >
+                                                            Feil
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <ResultBadge answer={a} type={gradingQuestion.type} />
+                                                )}
+                                                <PointsStepper
+                                                    username={a.username}
+                                                    points={a.points ?? 0}
+                                                    onChange={points => socket.emit('host:set_points', { roomCode, playerId: a.socketId, points })}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 )
                             })}
                         </div>
                     </div>
 
-                    <button
-                        onClick={() => socket.emit('host:grading_next', { roomCode })}
-                        className="btn btn-next btn-lg"
-                    >
-                        {gradingIndex + 1 < gradingTotal ? 'Neste spørsmål →' : 'Vis leaderboard'}
-                    </button>
+                    {gradingRevealed ? (
+                        <button
+                            onClick={() => socket.emit('host:grading_next', { roomCode })}
+                            className="btn btn-next btn-lg"
+                        >
+                            {gradingIndex + 1 < gradingTotal ? 'Neste spørsmål →' : 'Vis leaderboard'}
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => socket.emit('host:reveal', { roomCode })}
+                            className="btn btn-go btn-lg"
+                        >
+                            Vis svar for spillerne
+                        </button>
+                    )}
+                    <EndQuizButton onEnd={endQuiz} grading />
                 </div>
             </div>
         )
@@ -438,6 +456,8 @@ function HostLive() {
                         <p key={countdownLeft} className="text-8xl font-bold text-purple-700 tabular-nums motion-safe:animate-pop">{countdownLeft}</p>
                     </div>
                 )}
+
+                {(question || countdownLeft !== null) && <EndQuizButton onEnd={endQuiz} />}
             </div>
         </div>
     )

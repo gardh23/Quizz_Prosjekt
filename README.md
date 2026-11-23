@@ -104,7 +104,10 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 - `host:next` → starter nedtelling og sender neste spørsmål automatisk; etter siste spørsmål starter rettefasen. Ignoreres under nedtelling
 - `host:set_timer` → overstyrer timer live, og flytter serverens svarfrist (0–3600 sek)
 - `host:grade` → vurderer fritekst-svar (isCorrect: true/false) — kun i rettefasen. Ny vurdering erstatter forrige
-- `host:grading_next` → går til neste spørsmål i rettefasen, eller avslutter med leaderboard
+- `host:grading_next` → går til neste spørsmål i rettefasen (skjult igjen til `host:reveal`), eller avslutter med leaderboard
+- `host:reveal` → viser fasit, riktig/feil og poeng for spillerne på gjeldende rettespørsmål
+- `host:set_points` → `{ playerId, points }` setter en spillers poeng på gjeldende rettespørsmål til et heltall (også over 1 og negativt, alle typer). Erstatter forrige verdi
+- `host:end` → avslutter: under spørsmålene hoppes resten over og rettefasen starter for de stilte spørsmålene; i rettefasen går den rett til pallen
 - `host:rejoin` → gjenkobler etter frakobling — kun samme host-bruker, og quizen fortsetter i fasen den var i
 
 ### Spiller sender:
@@ -121,8 +124,8 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 - `session:countdown` → nedtelling mellom spørsmål `{ seconds: 5 }`
 - `player:answer_result` → tom kvittering på svar (til spiller); vises som flash-melding. Sier ikke om svaret var riktig
 - `host:free_text_answer` → fritekst-svar videresendt til host (oppdaterer eksisterende ved re-innsending)
-- `session:grading_question` → starter/oppdaterer rettefasen med `{ question, playerAnswers, gradingIndex, total }` — sendes til hele rommet
-- `session:answer_graded` → kringkastes til hele rommet når host retter et svar `{ username, isCorrect, points }`
+- `session:grading_question` → starter/oppdaterer rettefasen med `{ question, playerAnswers, distribution, revealed, gradingIndex, total }`. Sendes på nytt ved hver poengendring. Hosten får alt; spillerne får fasit, riktig/feil og poeng først når `revealed` er true
+- `session:answer_graded` → kun til hosten når et fritekstsvar rettes `{ username, isCorrect, points }` (spillerne får det via rettevisningen etter avsløring)
 - `session:finished` → quiz ferdig med endelig leaderboard (alle spillere + poeng)
 - `session:frozen` → host koblet fra, quiz fryst
 - `session:resumed` → host koblet til igjen
