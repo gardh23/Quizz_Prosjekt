@@ -1,6 +1,22 @@
 @import "tailwindcss";
 
 /*
+ * Entrance animations. Fill mode is `backwards`, not `both`: a lingering end state would
+ * override later transforms such as the chosen answer's scale. Use with `motion-safe:`.
+ */
+@theme {
+    --animate-pop: pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+    --animate-rise: rise 0.4s ease-out backwards;
+
+    @keyframes pop {
+        from { transform: scale(0.6); opacity: 0; }
+    }
+    @keyframes rise {
+        from { transform: translateY(16px); opacity: 0; }
+    }
+}
+
+/*
  * Button roles, defined once:
  *   go     — start, send, create, join (moves the user forward)
  *   next   — host advancing the game

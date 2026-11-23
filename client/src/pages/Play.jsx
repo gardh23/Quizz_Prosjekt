@@ -258,7 +258,7 @@ function Play() {
             <div className="min-h-screen bg-purple-900 flex items-center justify-center">
                 <div className="bg-white rounded-2xl p-10 text-center shadow-2xl">
                     <p className="text-gray-500 text-lg mb-2">Neste spørsmål om</p>
-                    <p className="text-8xl font-bold text-purple-700">{countdownLeft}</p>
+                    <p key={countdownLeft} className="text-8xl font-bold text-purple-700 tabular-nums motion-safe:animate-pop">{countdownLeft}</p>
                 </div>
             </div>
         )
@@ -274,7 +274,7 @@ function Play() {
                     <h1 className="text-2xl font-bold text-white mb-4">
                         Rettefase — <span className="text-yellow-300">{gradingIndex + 1} / {gradingTotal}</span>
                     </h1>
-                    <div className="bg-white rounded-2xl p-6 shadow-lg">
+                    <div key={gradingQuestion.id} className="bg-white rounded-2xl p-6 shadow-lg motion-safe:animate-rise">
                         <h2 className="text-xl font-bold text-purple-900 mb-2">{gradingQuestion.text}</h2>
                         {correctAnswers.length > 0 && (
                             <div className="flex flex-wrap gap-2 mb-3">
@@ -326,7 +326,7 @@ function Play() {
     if (joined && question) {
         return (
             <div className="min-h-screen bg-purple-900 flex flex-col">
-                <div className="bg-purple-800 p-6 text-center">
+                <div key={question.id} className="bg-purple-800 p-6 text-center motion-safe:animate-rise">
                     <div className="max-w-3xl mx-auto">
                     <Timer timeLeft={timeLeft} total={question.time_limit} />
                     <h1 className="text-3xl md:text-4xl font-bold text-white mt-5 leading-tight text-balance">{question.text}</h1>
@@ -388,6 +388,7 @@ function Play() {
                                 return (
                                 <button
                                     key={answer.id}
+                                    style={{ animationDelay: `${i * 60}ms` }}
                                     onClick={() => {
                                         setSelectedAnswerId(answer.id)
                                         socket.emit('player:answer', {
@@ -397,7 +398,7 @@ function Play() {
                                         })
                                     }}
                                     disabled={answered || timeLeft === 0}
-                                    className={`${answerColors[i % 4]} relative min-h-32 flex items-center gap-4 px-6 text-left font-bold text-2xl md:text-3xl rounded-2xl transition-all duration-300 disabled:cursor-default focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-yellow-300 ${state}`}
+                                    className={`${answerColors[i % 4]} motion-safe:animate-pop relative min-h-32 flex items-center gap-4 px-6 text-left font-bold text-2xl md:text-3xl rounded-2xl transition-all duration-300 disabled:cursor-default focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-yellow-300 ${state}`}
                                 >
                                     <AnswerLetter index={i} />
                                     <span className="break-words min-w-0">{answer.text}</span>
@@ -410,7 +411,7 @@ function Play() {
                         </div>
                     )}
                     {question.type === 'ranking' && (
-                        <div className="flex flex-col gap-3 max-w-lg mx-auto mt-4">
+                        <div key={question.id} className="flex flex-col gap-3 max-w-lg mx-auto mt-4 motion-safe:animate-rise">
                             {rankingOrder.map((item, i) => {
                                 const move = (to) => {
                                     const updated = [...rankingOrder]
@@ -502,8 +503,8 @@ function Play() {
                     <p className="text-gray-500 mb-6">Rom: <span className="font-bold text-purple-600">{roomCode}</span></p>
                     <h2 className="text-xl font-bold text-gray-700 mb-3">Spillere ({players.length})</h2>
                     <div className="flex flex-col gap-2">
-                        {players.map((p, i) => (
-                            <p key={i} className="bg-purple-100 text-purple-800 font-semibold py-2 rounded-lg">{p.username}</p>
+                        {players.map(p => (
+                            <p key={p.username} className="bg-purple-100 text-purple-800 font-semibold py-2 rounded-lg motion-safe:animate-pop">{p.username}</p>
                         ))}
                     </div>
                 </div>
@@ -515,7 +516,7 @@ function Play() {
         <div className="min-h-screen bg-purple-900 flex items-center justify-center">
             <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
                 <h1 className="text-4xl font-bold text-center text-purple-900 mb-8">Bli med i quiz</h1>
-                {error && <p className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-center">{error}</p>}
+                {error && <p role="alert" className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-center motion-safe:animate-rise">{error}</p>}
                 <form onSubmit={join} className="flex flex-col gap-4">
                     <input
                         value={roomCode}

@@ -208,7 +208,7 @@ function HostLive() {
                         <span className="bg-purple-700 text-purple-200 px-4 py-2 rounded-xl">{players.length} spillere</span>
                     </div>
 
-                    <div className="bg-white rounded-2xl p-6 mb-4 shadow-lg">
+                    <div key={gradingQuestion.id} className="bg-white rounded-2xl p-6 mb-4 shadow-lg motion-safe:animate-rise">
                         <h2 className="text-xl font-bold text-purple-900 mb-2">{gradingQuestion.text}</h2>
                         {correctAnswers.length > 0 && (
                             <div className="flex flex-wrap gap-2 mb-3">
@@ -302,7 +302,7 @@ function HostLive() {
                     </div>
                 )}
 
-                {error && <p role="alert" className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-center">{error}</p>}
+                {error && <p role="alert" className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-center motion-safe:animate-rise">{error}</p>}
 
                 {inLobby && (
                     <div>
@@ -327,7 +327,7 @@ function HostLive() {
                         ) : (
                             <div className="flex flex-wrap gap-2 mb-6">
                                 {players.map(p => (
-                                    <span key={p.username} className="bg-white text-purple-900 font-semibold px-4 py-2 rounded-full">{p.username}</span>
+                                    <span key={p.username} className="bg-white text-purple-900 font-semibold px-4 py-2 rounded-full motion-safe:animate-pop">{p.username}</span>
                                 ))}
                             </div>
                         )}
@@ -383,8 +383,8 @@ function HostLive() {
                                 />
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                {players.map((p, i) => (
-                                    <span key={i} className={`px-3 py-1 rounded-full text-sm font-semibold ${p.answers && p.answers[question.id] ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                                {players.map(p => (
+                                    <span key={`${p.username}-${!!p.answers?.[question.id]}`} className={`px-3 py-1 rounded-full text-sm font-semibold ${p.answers?.[question.id] ? 'bg-green-100 text-green-700 motion-safe:animate-pop' : 'bg-gray-100 text-gray-400'}`}>
                                         {p.username}
                                     </span>
                                 ))}
@@ -438,7 +438,7 @@ function HostLive() {
                 {countdownLeft !== null && !question && (
                     <div className="bg-white rounded-2xl p-10 text-center shadow-lg">
                         <p className="text-gray-500 text-lg mb-2">Neste spørsmål om</p>
-                        <p className="text-8xl font-bold text-purple-700">{countdownLeft}</p>
+                        <p key={countdownLeft} className="text-8xl font-bold text-purple-700 tabular-nums motion-safe:animate-pop">{countdownLeft}</p>
                     </div>
                 )}
             </div>

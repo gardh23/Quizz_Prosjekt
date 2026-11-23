@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { answerLetter } from '../answerLetter'
 
 // Bar colors follow the answer buttons' order (red, blue, yellow, green) so an option keeps
@@ -5,6 +6,14 @@ import { answerLetter } from '../answerLetter'
 const barColors = ['#ef4444', '#3b82f6', '#ca8a04', '#22c55e']
 
 function AnswerDistribution({ distribution }) {
+    // Bars start at 0 and grow on the next frame; the grading card is keyed per question,
+    // so this replays for each one. Without motion-safe the width just jumps.
+    const [grown, setGrown] = useState(false)
+    useEffect(() => {
+        const frame = requestAnimationFrame(() => setGrown(true))
+        return () => cancelAnimationFrame(frame)
+    }, [])
+
     if (!distribution || distribution.length === 0) return null
     const total = distribution.reduce((sum, o) => sum + o.count, 0)
     const max = Math.max(1, ...distribution.map(o => o.count))
@@ -21,10 +30,11 @@ function AnswerDistribution({ distribution }) {
                     </span>
                     <div role="cell" className="flex-1 h-6">
                         <div
-                            className="h-full rounded-r"
+                            className="h-full rounded-r motion-safe:transition-[width] motion-safe:duration-700 motion-safe:ease-out motion-safe:[transition-delay:var(--bar-delay)]"
                             style={{
-                                width: `${(o.count / max) * 100}%`,
-                                minWidth: o.count ? 4 : 0,
+                                width: grown ? `${(o.count / max) * 100}%` : 0,
+                                minWidth: grown && o.count ? 4 : 0,
+                                '--bar-delay': `${i * 80}ms`,
                                 backgroundColor: barColors[i % barColors.length]
                             }}
                         />
