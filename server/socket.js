@@ -1,4 +1,5 @@
 const pool = require('./db')
+const { buildResults } = require('./results')
 
 const adjectives = [
     'YPPERLIG', 'FANTASTISK', 'MODIG', 'GLAD', 'STERK', 'RASK', 'LUR', 'SNILL',
@@ -214,15 +215,8 @@ module.exports = function (io, db = pool, {
     }
 
     function finishGame(roomCode, session) {
-        const sorted = Object.values(session.players).sort((a, b) => b.score - a.score)
-        // Ties share a place and the next place is skipped (1, 1, 3).
-        const leaderboard = sorted.map(p => ({
-            username: p.username,
-            score: p.score,
-            rank: 1 + sorted.filter(other => other.score > p.score).length
-        }))
         session.status = 'finished'
-        io.to(roomCode).emit('session:finished', { leaderboard })
+        io.to(roomCode).emit('session:finished', buildResults(session))
         delete sessions[roomCode]
     }
 
