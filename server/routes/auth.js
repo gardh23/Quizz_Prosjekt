@@ -12,8 +12,20 @@ const authLimiter = rateLimit({
     message: { error: 'For mange forsøk — prøv igjen om 15 minutter' }
 })
 
+// Bots post here with no body or odd JSON; anything but two non-blank strings is a client error.
+function readCredentials(req, res) {
+    const { username, password } = req.body ?? {}
+    if (typeof username !== 'string' || typeof password !== 'string' || !username.trim() || !password) {
+        res.status(400).json({ error: 'Brukernavn og passord må fylles ut' })
+        return null
+    }
+    return { username, password }
+}
+
 router.post('/register', authLimiter, async (req, res) => {
-    const { username, password } = req.body
+    const credentials = readCredentials(req, res)
+    if (!credentials) return
+    const { username, password } = credentials
 
     try {
         const existing = await pool.query('SELECT id FROM users WHERE username = $1', [username])
@@ -36,7 +48,9 @@ router.post('/register', authLimiter, async (req, res) => {
 })
 
 router.post('/login', authLimiter, async (req, res) => {
-    const { username, password } = req.body
+    const credentials = readCredentials(req, res)
+    if (!credentials) return
+    const { username, password } = credentials
 
     try {
         const result = await pool.query('SELECT * FROM users WHERE username = $1', [username])
