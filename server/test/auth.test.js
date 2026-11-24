@@ -57,3 +57,20 @@ test('login with a well-formed body still reaches the database', async () => {
     assert.equal(res.status, 401)
     assert.equal(queries.length, 1)
 })
+
+// In production every request reaches Express from NGINX on 127.0.0.1; only X-Real-IP tells clients apart.
+async function loginFrom(ip) {
+    const res = await fetch(`${base}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Real-IP': ip },
+        body: '{"username":"ada","password":"pw"}'
+    })
+    return res.status
+}
+
+test('one client hitting the login limit does not lock out another client', async () => {
+    queries = []
+    for (let i = 0; i < 10; i++) assert.equal(await loginFrom('203.0.113.7'), 401)
+    assert.equal(await loginFrom('203.0.113.7'), 429)
+    assert.equal(await loginFrom('198.51.100.20'), 401)
+})

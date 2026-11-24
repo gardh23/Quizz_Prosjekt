@@ -4,11 +4,14 @@ const bcrypt = require('bcrypt')
 const pool = require('../db')
 const JWT_SECRET = process.env.JWT_SECRET
 const jwt = require('jsonwebtoken')
-const rateLimit = require('express-rate-limit')
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit')
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 10,
+    // Behind NGINX req.ip is always 127.0.0.1, which made this one limit shared by everyone.
+    // X-Real-IP is safe to trust: Express listens only on 127.0.0.1 and NGINX overwrites the header.
+    keyGenerator: (req) => ipKeyGenerator(req.headers['x-real-ip'] || req.ip),
     message: { error: 'For mange forsøk — prøv igjen om 15 minutter' }
 })
 
