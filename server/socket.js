@@ -465,6 +465,11 @@ module.exports = function (io, db = pool, {
                 }
             }
 
+            // Only free text can be resubmitted. Identical resubmissions are not counted as changes.
+            const previous = player.answers[question.id]
+            if (previous) {
+                record.changes = (previous.changes || 0) + (previous.freeTextResponse !== record.freeTextResponse ? 1 : 0)
+            }
             player.answers[question.id] = record
             player.score += record.points
             socket.emit('player:answer_result', {})
