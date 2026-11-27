@@ -413,6 +413,29 @@ function HostLive() {
                             </div>
                         </div>
 
+                        <button
+                            onClick={next}
+                            className="btn btn-next btn-lg"
+                        >
+                            Neste spørsmål
+                        </button>
+
+                        <details className="mt-4 mb-4 text-purple-200">
+                            <summary className="cursor-pointer text-sm font-semibold w-fit">Juster tid</summary>
+                            <form onSubmit={overrideTimer} className="flex gap-3 mt-3">
+                                <input
+                                    value={timer}
+                                    onChange={e => setTimer(e.target.value)}
+                                    placeholder="Sekunder igjen"
+                                    type="number"
+                                    min="0"
+                                    className="field flex-1 text-base"
+                                />
+                                <button type="submit" className="btn btn-soft">Sett tid</button>
+                            </form>
+                        </details>
+
+                        {/* Below the controls: this list grows with every answer and must not push them. */}
                         {question.type === 'free_text' && Object.keys(freeTextAnswers).length > 0 && (
                             <div className="bg-white rounded-2xl p-5 mb-4 shadow-lg">
                                 <h3 className="text-lg font-bold text-purple-900 mb-1">Fritekst-svar</h3>
@@ -432,28 +455,6 @@ function HostLive() {
                                 </div>
                             </div>
                         )}
-
-                        <button
-                            onClick={next}
-                            className="btn btn-next btn-lg"
-                        >
-                            Neste spørsmål
-                        </button>
-
-                        <details className="mt-4 text-purple-200">
-                            <summary className="cursor-pointer text-sm font-semibold w-fit">Juster tid</summary>
-                            <form onSubmit={overrideTimer} className="flex gap-3 mt-3">
-                                <input
-                                    value={timer}
-                                    onChange={e => setTimer(e.target.value)}
-                                    placeholder="Sekunder igjen"
-                                    type="number"
-                                    min="0"
-                                    className="field flex-1 text-base"
-                                />
-                                <button type="submit" className="btn btn-soft">Sett tid</button>
-                            </form>
-                        </details>
                     </div>
                 )}
 
