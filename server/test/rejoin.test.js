@@ -101,3 +101,26 @@ test('a host who drops during grading comes back to grading', async () => {
     assert.equal((await next).gradingIndex, 1)
     assert.ok(await never(ada, 'session:question'))
 })
+
+test('a rejoining player learns which question of how many is running', async () => {
+    const { host, players: [ada], roomCode } = await startGame(server, ['ada'])
+    const next = once(ada, 'session:question')
+    host.emit('host:next', { roomCode })
+    await next
+
+    ada.disconnect()
+    await new Promise(r => setTimeout(r, 50))
+    const viaRejoin = server.client()
+    viaRejoin.emit('player:rejoin', { roomCode, username: 'ada' })
+    const rejoined = await once(viaRejoin, 'player:rejoined')
+    assert.equal(rejoined.index, 1)
+    assert.equal(rejoined.total, 2)
+
+    viaRejoin.disconnect()
+    await new Promise(r => setTimeout(r, 50))
+    const viaJoin = server.client()
+    viaJoin.emit('player:join', { roomCode, username: 'ada' })
+    const joinedAgain = await once(viaJoin, 'player:rejoined')
+    assert.equal(joinedAgain.index, 1)
+    assert.equal(joinedAgain.total, 2)
+})

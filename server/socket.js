@@ -311,7 +311,7 @@ module.exports = function (io, db = pool, {
                     ? session.questions[session.currentQuestion]
                     : null
                 const timeRemaining = currentQuestion ? secondsRemaining(session) : null
-                socket.emit('player:rejoined', { score: playerData.score, status: session.status, question: questionForPlayers(currentQuestion), timeRemaining })
+                socket.emit('player:rejoined', { score: playerData.score, status: session.status, question: questionForPlayers(currentQuestion), index: session.currentQuestion, total: session.questions?.length ?? 0, timeRemaining })
                 io.to(roomCode).emit('session:players', { players: publicPlayers(session) })
                 return
             }
@@ -758,6 +758,8 @@ module.exports = function (io, db = pool, {
                 score: session.players[socket.id].score,
                 status: session.status,
                 question: questionForPlayers(currentQuestion),
+                index: session.currentQuestion,
+                total: session.questions?.length ?? 0,
                 timeRemaining
             })
             io.to(roomCode).emit('session:players', { players: publicPlayers(session) })

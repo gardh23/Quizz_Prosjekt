@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import socket from '../socket'
+import QuestionCounter from '../components/QuestionCounter'
 import TopBar from '../components/TopBar'
 import { mediaBase } from '../api'
 import AnswerDistribution from '../components/AnswerDistribution'
@@ -37,6 +38,8 @@ function HostLive() {
     const [gradingIndex, setGradingIndex] = useState(0)
     const [gradingTotal, setGradingTotal] = useState(0)
     const [gradingRevealed, setGradingRevealed] = useState(false)
+    const [questionIndex, setQuestionIndex] = useState(null)
+    const [questionTotal, setQuestionTotal] = useState(0)
 
     const startTimer = (seconds) => {
         if (timerRef.current) clearInterval(timerRef.current)
@@ -57,9 +60,11 @@ function HostLive() {
         if (socket.connected) rejoin()
 
         socket.on('host:rejoined', ({ status }) => setPhase(status))
-        socket.on('session:resumed', ({ question, timeRemaining }) => {
+        socket.on('session:resumed', ({ question, index, total, timeRemaining }) => {
             if (!question) return
             setQuestion(question)
+            setQuestionIndex(index)
+            setQuestionTotal(total)
             setCountdownLeft(null)
             startTimer(timeRemaining)
         })
@@ -68,10 +73,12 @@ function HostLive() {
             else setError(message)
         })
         socket.on('session:players', ({ players }) => setPlayers(players))
-        socket.on('session:question', ({ question }) => {
+        socket.on('session:question', ({ question, index, total }) => {
             setPhase('active')
             setError('')
             setQuestion(question)
+            setQuestionIndex(index)
+            setQuestionTotal(total)
             setFreeTextAnswers({})
             setCountdownLeft(null)
             if (countdownRef.current) clearInterval(countdownRef.current)
@@ -371,6 +378,7 @@ function HostLive() {
                 {question && (
                     <div>
                         <div className={`bg-white rounded-2xl p-6 mb-4 shadow-lg transition-shadow ${allAnswered ? 'ring-4 ring-green-400' : ''}`}>
+                            <QuestionCounter index={questionIndex} total={questionTotal} tone="light" />
                             <Timer timeLeft={timeLeft} total={question.time_limit} tone="light" />
                             <h2 className="text-2xl font-bold text-purple-900 mt-4 mb-3 leading-tight text-balance">{question.text}</h2>
                             {question.image_path && (

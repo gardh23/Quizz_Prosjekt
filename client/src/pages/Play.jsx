@@ -4,6 +4,7 @@ import { mediaBase } from '../api'
 import AnswerDistribution from '../components/AnswerDistribution'
 import FinalResults from '../components/FinalResults'
 import { sounds, startLobbyMusic, stopLobbyMusic } from '../sound'
+import QuestionCounter from '../components/QuestionCounter'
 import Timer from '../components/Timer'
 import AnswerLetter from '../components/AnswerLetter'
 import ResultBadge from '../components/ResultBadge'
@@ -54,6 +55,8 @@ function Play() {
     const revealSoundRef = useRef(null)
     const [gradingIndex, setGradingIndex] = useState(0)
     const [gradingTotal, setGradingTotal] = useState(0)
+    const [questionIndex, setQuestionIndex] = useState(null)
+    const [questionTotal, setQuestionTotal] = useState(0)
 
     const startTimer = (seconds) => {
         if (timerRef.current) clearInterval(timerRef.current)
@@ -89,11 +92,13 @@ function Play() {
 
     useEffect(() => {
         socket.on('player:joined', () => setJoined(true))
-        socket.on('player:rejoined', ({ status, question, timeRemaining }) => {
+        socket.on('player:rejoined', ({ status, question, index, total, timeRemaining }) => {
             isRejoinAttemptRef.current = false
             setJoined(true)
             if (status === 'active' && question) {
                 setQuestion(question)
+                setQuestionIndex(index ?? null)
+                setQuestionTotal(total ?? 0)
                 setRankingOrder(question.answers || [])
                 setQuestionStartTime(Date.now())
                 startTimer(timeRemaining)
@@ -107,8 +112,10 @@ function Play() {
             setError(data.message)
         })
         socket.on('session:players', ({ players }) => setPlayers(players))
-        socket.on('session:question', ({ question }) => {
+        socket.on('session:question', ({ question, index, total }) => {
             setQuestion(question)
+            setQuestionIndex(index)
+            setQuestionTotal(total)
             setQuestionStartTime(Date.now())
             setAnswered(false)
             setConfirmFlash(false)
@@ -334,6 +341,7 @@ function Play() {
             <div className="min-h-screen bg-purple-900 flex flex-col">
                 <div key={question.id} className="bg-purple-800 p-6 text-center motion-safe:animate-rise">
                     <div className="max-w-3xl mx-auto">
+                    <QuestionCounter index={questionIndex} total={questionTotal} />
                     <Timer timeLeft={timeLeft} total={question.time_limit} />
                     <h1 className="text-3xl md:text-4xl font-bold text-white mt-5 leading-tight text-balance">{question.text}</h1>
                     {/* Fixed height so the layout does not jump when the answer is registered. */}

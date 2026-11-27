@@ -118,9 +118,9 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 ### Server sender til rom:
 - `host:created` → romkode klar
 - `player:joined` → bekreftelse til spiller
-- `player:rejoined` → bekreftelse på rejoin med `{ score, status, question, timeRemaining }`
+- `player:rejoined` → bekreftelse på rejoin med `{ score, status, question, index, total, timeRemaining }`
 - `session:players` → oppdatert spillerliste `{ username, connected, answers: { [questionId]: true } }` — sier bare HVEM som har svart, ikke hva eller om det var riktig
-- `session:question` → nytt spørsmål. Spillere får bare `{ id, text }` per alternativ (fritekst: ingen alternativer); host får hele spørsmålet med fasit
+- `session:question` → nytt spørsmål med `{ question, index, total }` (vises som «Spørsmål N av M»). Spillere får bare `{ id, text }` per alternativ (fritekst: ingen alternativer); host får hele spørsmålet med fasit
 - `session:countdown` → nedtelling mellom spørsmål `{ seconds: 5 }`
 - `player:answer_result` → tom kvittering på svar (til spiller); vises som flash-melding. Sier ikke om svaret var riktig
 - `host:free_text_answer` → fritekst-svar videresendt til host (oppdaterer eksisterende ved re-innsending)
@@ -145,7 +145,7 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 - **Leaderboard ved uavgjort**: lik poengsum gir delt plass, neste plass hoppes over (1, 1, 3)
 - **Pall**: `components/Podium.jsx` avslører 3. → 2. → 1. plass, med konfetti (`canvas-confetti`) og fanfare. Respekterer `prefers-reduced-motion`
 - **Designsystem**: knapperoller og feltstil defineres én gang i `src/index.css` (`.btn` + `.btn-go`/`.btn-next`/`.btn-soft`/`.btn-ghost`/`.btn-danger`/`.btn-danger-soft`/`.btn-lg`, `.field`). Bruk dem i stedet for egne fargeklasser. Inngangsanimasjoner (`animate-pop`, `animate-rise`) ligger i `@theme` og brukes alltid med `motion-safe:`
-- **Delte komponenter**: `TopBar` (tilbake + brukermerke i flyt, ikke `fixed`), `Timer` (sekunder + tidslinje), `AnswerLetter` (A–D på svarknapper og i svarfordelingen), `ResultBadge` (✓ kun når helt riktig, oransje delpoeng, rødt ✗), `YouBadge`, `FilePicker`
+- **Delte komponenter**: `TopBar` (tilbake + brukermerke i flyt, ikke `fixed`), `Timer` (sekunder + tidslinje), `QuestionCounter` («Spørsmål N av M» over timeren), `AnswerLetter` (A–D på svarknapper og i svarfordelingen), `ResultBadge` (✓ kun når helt riktig, oransje delpoeng, rødt ✗), `YouBadge`, `FilePicker`
 - **Invitasjon**: «Kopier invitasjon» i lobbyen lager en lenke `…/quiz/play?rom=KODE` som fyller ut romkoden
 - **Lyd**: `src/sound.js` syntetiserer alt med Web Audio (ingen lydfiler). Toner hoppes over til nettleseren har låst opp lyd (første klikk). Mute-valget lagres i `localStorage` (`quizz_muted`)
 - **freeTextResponse**: Spillers tekst sendes separat fra `answerId` (fasit-IDen); kan sendes inn på nytt så lenge timer ikke er ute
