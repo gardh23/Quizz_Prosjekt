@@ -8,4 +8,11 @@ const pool = new Pool({
   port: process.env.DB_PORT
 })
 
+// An idle client dying (e.g. PostgreSQL restarting during an update) is emitted here.
+// Unhandled, it would exit the process and drop every running game; the pool replaces
+// the client on the next query.
+pool.on('error', err => {
+  console.error('Databasetilkobling feilet (ledig klient):', err.message)
+})
+
 module.exports = pool
