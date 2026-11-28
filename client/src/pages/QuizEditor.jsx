@@ -84,19 +84,29 @@ function QuizEditor() {
         if (imageFile) formData.append('image', imageFile)
         if (audioFile) formData.append('audio', audioFile)
 
-        if (editingQuestion) {
-            formData.append('order_index', editingQuestion.order_index)
-            await api.put(`/quizzes/${id}/questions/${editingQuestion.id}`, formData)
-            setQuiz({
-                ...quiz,
-                questions: quiz.questions.map(q =>
-                    q.id === editingQuestion.id ? { ...q, type, text, time_limit: timeLimit, answers: toSave, image_width: imageWidth } : q
-                )
-            })
-        } else {
-            formData.append('order_index', quiz.questions.length + 1)
-            const res = await api.post(`/quizzes/${id}/questions`, formData)
-            setQuiz({ ...quiz, questions: [...quiz.questions, { ...res.data, answers: toSave }] })
+        // On failure the form keeps its content so the host can pick another file and retry.
+        try {
+            if (editingQuestion) {
+                formData.append('order_index', editingQuestion.order_index)
+                await api.put(`/quizzes/${id}/questions/${editingQuestion.id}`, formData)
+                setQuiz({
+                    ...quiz,
+                    questions: quiz.questions.map(q =>
+                        q.id === editingQuestion.id ? { ...q, type, text, time_limit: timeLimit, answers: toSave, image_width: imageWidth } : q
+                    )
+                })
+            } else {
+                formData.append('order_index', quiz.questions.length + 1)
+                const res = await api.post(`/quizzes/${id}/questions`, formData)
+                setQuiz({ ...quiz, questions: [...quiz.questions, { ...res.data, answers: toSave }] })
+            }
+        } catch (err) {
+            // NGINX turns away bodies over its own 10 MB limit with an HTML 413, so the
+            // status is the only thing to go on there.
+            const status = err.response?.status
+            window.alert(err.response?.data?.error
+                || (status === 413 ? 'Filen er for stor (maks 10 MB)' : 'Kunne ikke lagre spørsmålet'))
+            return
         }
 
         resetForm()

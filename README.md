@@ -168,7 +168,7 @@ answers       — id, question_id (FK), text, is_correct (DEFAULT true)
 - **Rate limiting**: Login og register er rate-limited per IP
 - **Input-validering socket**: `username` maks 30 tegn, `freeTextResponse` maks 100 tegn
 - **Quiz-eierskap**: Host kan bare slette/redigere egne quizer — admin kan gjøre det for alle
-- **Filopplasting**: Både MIME-type og filendelse valideres, `audio/mp3` hvitelistet i tillegg til `audio/mpeg`
+- **Filopplasting**: Både MIME-type og filendelse valideres, `audio/mp3` hvitelistet i tillegg til `audio/mpeg`. Avviste filer gir 400 (feil type) eller 413 (over 10 MB) med en `error`-melding (`middleware/uploadErrors.js`), som redigeringssiden viser til hosten
 - **uploads/-mappen**: Opprettes automatisk ved serveroppstart via `fs.mkdirSync('uploads', { recursive: true })`
 - **COALESCE ved spørsmålsoppdatering**: PUT-ruten bruker `COALESCE($5, image_path)` for å beholde eksisterende bilde/lyd hvis ingen ny fil lastes opp
 - **image_width**: Slider med live preview i QuizEditor, begge Play og preview begrenset til `max-w-2xl` for at % skal matche

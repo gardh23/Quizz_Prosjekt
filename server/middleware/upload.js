@@ -19,7 +19,9 @@ const fileFilter = function (req, file, cb) {
     if (allowedMimes.includes(file.mimetype) && allowedExts.includes(ext)) {
         cb(null, true)
     } else {
-        cb(new Error('Kun jpg, png og mp3 er tillatt'), false)
+        const err = new Error('Kun jpg, png og mp3 er tillatt')
+        err.code = 'UPLOAD_REJECTED_TYPE'
+        cb(err, false)
     }
 }
 

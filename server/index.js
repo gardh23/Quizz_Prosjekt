@@ -7,6 +7,7 @@ const http = require('http')
 const { Server } = require('socket.io')
 const jwt = require('jsonwebtoken')
 const adminRoutes = require('./routes/admin')
+const uploadErrors = require('./middleware/uploadErrors')
 
 const app = express()
 const server = http.createServer(app)
@@ -29,6 +30,7 @@ app.use('/uploads', express.static('uploads'))
 app.use('/auth', authRoutes)
 app.use('/quizzes', quizRoutes)
 app.use('/admin', adminRoutes) 
+app.use(uploadErrors)
 
 app.get('/', async (req, res) => {
   const result = await pool.query('SELECT NOW()')
